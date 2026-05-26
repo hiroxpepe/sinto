@@ -20,16 +20,29 @@ public sealed class AudioRingBuffer<T> where T : struct
     private int  _tail;
 
     public AudioRingBuffer(int capacityPow2 = 1024) {
-        if (capacityPow2 <= 0 || (capacityPow2 & (capacityPow2 - 1)) != 0)
+        // Capacity=1 wastes all slots (SPSC sacrifices 1 slot → 0 usable). Minimum is 2.
+        if (capacityPow2 < 2 || (capacityPow2 & (capacityPow2 - 1)) != 0)
             throw new ArgumentException(
                 $"Capacity must be a positive power of 2. Got: {capacityPow2}");
         _buffer = new T[capacityPow2];
         _mask   = capacityPow2 - 1;
     }
 
-    public int  Count   => (_tail - _head) & _mask;
-    public bool IsEmpty => Volatile.Read(ref _head) == Volatile.Read(ref _tail);
-    public bool IsFull  => ((_tail + 1) & _mask) == Volatile.Read(ref _head);
+    // Diagnostic properties: read _head and _tail into locals ONCE before computing.
+    // Reading _tail twice (once for subtraction, once for comparison) creates a Torn Read:
+    //   another thread may update _tail between the two reads, yielding impossible values.
+    public int Count {
+        get { int h = Volatile.Read(ref _head); int t = Volatile.Read(ref _tail);
+              return (t - h) & _mask; }
+    }
+    public bool IsEmpty {
+        get { int h = Volatile.Read(ref _head); int t = Volatile.Read(ref _tail);
+              return h == t; }
+    }
+    public bool IsFull {
+        get { int h = Volatile.Read(ref _head); int t = Volatile.Read(ref _tail);
+              return ((t + 1) & _mask) == h; }
+    }
 
     public bool TryEnqueue(in T item) {
         int tail = Volatile.Read(ref _tail);

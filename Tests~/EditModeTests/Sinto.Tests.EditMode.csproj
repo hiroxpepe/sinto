@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Scripts\Sinto.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\MiniUnity\**\*.cs" />
+  </ItemGroup>
 </Project>
