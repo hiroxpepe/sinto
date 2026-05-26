@@ -1,0 +1,14 @@
+{
+  "name": "Sinto.Tests.EditMode",
+  "rootNamespace": "Sinto.Tests",
+  "references": ["Sinto.Core"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
