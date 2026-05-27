@@ -36,6 +36,8 @@ public sealed class MicroEngine {
         _osc1_params = new OscParams(WaveType.Sine);
         _osc2_params = new OscParams(WaveType.Sine);
         _amp_params  = EnvParams.Default;
+        _voice.Osc1MasterLevel   = 1.0f;
+        _voice.Osc2MasterLevel   = 1.0f;
         _voice.SmoothedCutoff    = new Smoother(0.7f, 20f, sample_rate);
         _voice.SmoothedResonance = new Smoother(0.0f, 20f, sample_rate);
         _voice.SmoothedAmpLevel  = new Smoother(1.0f, 20f, sample_rate);

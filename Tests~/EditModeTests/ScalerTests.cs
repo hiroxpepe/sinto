@@ -68,8 +68,8 @@ public class ScalerTests
 
     [Test] public void OnCallbackEnd_HighLoad_TierDecreases()
     {
-        // FakeTimeProvider を使って Thread.Sleep なしで高負荷を注入する。
-        // Thread.Sleep(5) は Windows で最悪 15.6ms 待機し Flaky Test になる。
+        // Use FakeTimeProvider to inject high load without Thread.Sleep.
+        // Thread.Sleep(5) can wait up to 15.6ms on Windows, causing flaky tests.
         var fake = new FakeTimeProvider();
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, fake);
@@ -86,18 +86,18 @@ public class ScalerTests
 
     [Test] public void CooldownPreventsHunting()
     {
-        // ティアを1回下げた直後は、さらに下がらないことを確認する。
+        // After one tier-down, verify cooldown prevents further tier changes.
         var fake = new FakeTimeProvider();
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, fake);
 
         double overloadMs = (BufLen / (double)SampleRate) * 1000.0 * 0.75;
 
-        // 1回目のティアダウンを誘発
+        // Trigger the first tier-down
         vs.OnCallbackBegin(); fake.AdvanceMs(overloadMs); vs.OnCallbackEnd(BufLen, SampleRate);
         int tierAfterFirst = vs.CurrentTierIndex;
 
-        // 直後に再度過負荷を与えてもクールダウン中なのでティアが変わらない
+        // Subsequent overload during cooldown must not change tier
         vs.OnCallbackBegin(); fake.AdvanceMs(overloadMs); vs.OnCallbackEnd(BufLen, SampleRate);
         Assert.That(vs.CurrentTierIndex, Is.EqualTo(tierAfterFirst),
             "Cooldown must prevent double tier-down (hunting).");
@@ -160,10 +160,10 @@ public class ScalerTests
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, fake);
 
-        // まずティア1に下げる
+        // First, force tier down to tier 1
         vs.ForceSetTier(1);
 
-        // 低負荷を 301 コールバック分注入（HeadroomCallbacks = 300 を超える）
+        // Inject 301 low-load callbacks (exceeds HeadroomCallbacks = 300)
         double lowLoadMs = (BufLen / (double)SampleRate) * 1000.0 * 0.3; // 30% usage
         for (int i = 0; i < 301; i++) {
             vs.OnCallbackBegin();

@@ -17,7 +17,12 @@ public sealed class Voices {
     private float _filter_resonance_base;
     private float _portamento_time;
     private FilterKind _filter_mode;
-    private bool _sustain_pedal_down;
+    private bool  _sustain_pedal_down;
+    private float _osc1_level = 1.0f;
+    private float _osc2_level = 0.5f;
+    private float _detune_cents = 0f;
+    private float _filter_env_amount;
+    private EnvParams _filter_env_params = new EnvParams(0.01f, 0.3f, 0f, 0.2f);
     private LfoParams _lfo1_params;
     private LfoParams _lfo2_params;
     private Lfo _lfo1;
@@ -53,6 +58,10 @@ public sealed class Voices {
         for (int i = 0; i < maxVoices; i++) {
             ref var v = ref _voices[i];
             v.VoiceIndex        = i;
+            v.Osc1MasterLevel   = 1.0f;
+            v.Osc2MasterLevel   = 0.5f;
+            v.PitchEnvAmount    = 0f;
+            v.FilterEnvAmount   = 0f;
             v.SmoothedCutoff    = new Smoother(_filter_cutoff_base, 20f, sampleRate);
             v.SmoothedResonance = new Smoother(_filter_resonance_base, 20f, sampleRate);
             v.SmoothedAmpLevel  = new Smoother(1f, 20f, sampleRate);
@@ -70,10 +79,12 @@ public sealed class Voices {
             if (idx < 0) return; // Could not steal
         }
         ref var v = ref _voices[idx];
+        v.Osc1MasterLevel = _osc1_level;
+        v.Osc2MasterLevel = _osc2_level;
         // Set filter base via voice's smoother
         v.SmoothedCutoff.SetTarget(_filter_cutoff_base);
         v.SmoothedResonance.SetTarget(_filter_resonance_base);
-        v.NoteOn(note, osc1p, osc2p, ampP, filterP, pitchP, _portamento_time, _sample_rate);
+        v.NoteOn(note, osc1p, osc2p, ampP, _filter_env_params, pitchP, _portamento_time, _sample_rate);
     }
 
     public void NoteOff(int midiNote, int trackId) {
@@ -117,10 +128,39 @@ public sealed class Voices {
         _lfo2.SetBPM(bpm, _lfo2_params, _sample_rate);
     }
 
+    public void SetOscLevels(float osc1Level, float osc2Level, float detuneCents) {
+        _osc1_level = osc1Level < 0f ? 0f : (osc1Level > 1f ? 1f : osc1Level);
+        _osc2_level = osc2Level < 0f ? 0f : (osc2Level > 1f ? 1f : osc2Level);
+        _detune_cents = detuneCents;
+        // 鳴っている全ボイスに即時反映
+        for (int i = 0; i < _max_voices; i++) {
+            _voices[i].Osc1MasterLevel = _osc1_level;
+            _voices[i].Osc2MasterLevel = _osc2_level;
+        }
+    }
+
+    public void SetFilterEnv(float attack, float decay, float sustain, float release) {
+        _filter_env_params = new EnvParams(attack, decay, sustain, release);
+    }
+
+    public void SetFilterEnvAmount(float amount) {
+        if (amount < 0f) amount = 0f;
+        if (amount > 1f) amount = 1f;
+        _filter_env_amount = amount;
+        for (int i = 0; i < _max_voices; i++) {
+            _voices[i].FilterEnvAmount = amount;
+        }
+    }
+
     public void SetFilterParams(float cutoff, float resonance, FilterKind mode) {
         _filter_cutoff_base = cutoff;
         _filter_resonance_base = resonance;
         _filter_mode = mode;
+        // Propagate filter mode to all voices (must update Voice.FilterMode field
+        // because Voice.Tick reads its own FilterMode, not the manager's)
+        for (int i = 0; i < _max_voices; i++) {
+            _voices[i].FilterMode = mode;
+        }
     }
 
     public void SetPortamentoTime(float seconds) => _portamento_time = seconds;

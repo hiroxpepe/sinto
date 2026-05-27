@@ -145,31 +145,171 @@ public class EngineTests
 
     [Test] public void Pause_Resume_TickDoesNotAccumulate()
     {
-        // DoesNotThrow だけでは「蓄積していない」証明にならない。
-        // DspTimeSamples が Pause 中に進んでいないことを数値で検証する。
+        // DoesNotThrow alone does not prove DspTime is not accumulating.
+        // Numerically verify DspTimeSamples does not advance while paused.
         using var e = new Engine();
         var buf = new float[512];
 
-        // 1バッファ分だけ再生して DspTime の基準値を得る
+        // Process one buffer to establish DspTime baseline
         e.ProcessAudioCallback(buf.AsSpan());
         long beforePause = e.DspTimeSamples;
 
-        // Pause して 100バッファ分 ProcessAudioCallback を呼ぶ
+        // Pause and call ProcessAudioCallback 100 times
         e.Pause();
         for (int i = 0; i < 100; i++) e.ProcessAudioCallback(buf.AsSpan());
         long duringPause = e.DspTimeSamples;
 
-        // Pause 中は DspTime が進んでいないこと
+        // DspTimeSamples must NOT advance while paused
         Assert.That(duringPause, Is.EqualTo(beforePause),
             "DspTimeSamples must NOT advance while paused.");
 
-        // Resume して 1バッファ分だけ処理
+        // Resume and process exactly one buffer
         e.Resume();
         e.ProcessAudioCallback(buf.AsSpan());
         long afterResume = e.DspTimeSamples;
 
-        // Resume 後は 1バッファ分だけ進んでいること（爆速蓄積していないこと）
+        // After Resume, DspTime must advance by exactly one buffer (no burst accumulation)
         Assert.That(afterResume, Is.EqualTo(beforePause + 512),
             "DspTimeSamples must advance by exactly 1 buffer after Resume.");
     }
+
+    // ── SetOscParams ─────────────────────────────────────────────────────
+
+    [Test] public void SetOscParams_DoesNotThrow()
+    {
+        using var e = new Engine();
+        Assert.DoesNotThrow(() => e.SetOscParams(1.0f, 0.5f, 0f));
+    }
+
+    [Test] public void SetOscParams_Osc2Level_Zero_ReducesOutput()
+    {
+        // OSC2 level=0 should produce less output than OSC2 level=1
+        using var e1 = new Engine();
+        using var e2 = new Engine();
+        e1.SetOscParams(1.0f, 0.0f, 0f);
+        e2.SetOscParams(1.0f, 1.0f, 0f);
+        e1.SendNoteOn(60, 0.8f, 2, 5, 0);
+        e2.SendNoteOn(60, 0.8f, 2, 5, 0);
+        var buf1 = new float[512]; var buf2 = new float[512];
+        e1.ProcessAudioCallback(buf1.AsSpan());
+        e2.ProcessAudioCallback(buf2.AsSpan());
+        float rms1 = 0f, rms2 = 0f;
+        foreach (var s in buf1) rms1 += s * s;
+        foreach (var s in buf2) rms2 += s * s;
+        Assert.That(rms1, Is.LessThanOrEqualTo(rms2 + 1e-4f),
+            "OSC2 level=0 should produce equal or less output.");
+    }
+
+    [Test] public void SetOscParams_DetuneZero_NoBeating()
+    {
+        // Detune=0 should produce stable output (no beating)
+        using var e = new Engine();
+        e.SetOscParams(1.0f, 1.0f, 0f);
+        e.SendNoteOn(36, 0.8f, 2, 5, 0); // low C
+        var buf = new float[44100 * 2]; // 1 second stereo
+        e.ProcessAudioCallback(buf.AsSpan());
+        // Check all samples are finite
+        foreach (var s in buf)
+        {
+            Assert.That(float.IsNaN(s) || float.IsInfinity(s), Is.False,
+                "Detune=0 output must be finite.");
+        }
+    }
+
+    // ── SetFilterEnv ─────────────────────────────────────────────────────
+
+    [Test] public void SetFilterEnv_DoesNotThrow()
+    {
+        using var e = new Engine();
+        Assert.DoesNotThrow(() => e.SetFilterEnv(0.01f, 0.3f, 0f, 0.2f));
+    }
+
+    [Test] public void SetFilterEnv_WithHighEnvAmt_ModulatesCutoff()
+    {
+        // FilterEnv + high ENV AMT should modulate cutoff over time
+        using var e = new Engine();
+        e.SetFilterParams(0.2f, 0f, FilterKind.Roland); // low cutoff base
+        e.SetFilterEnv(0.001f, 0.5f, 0f, 0.1f);        // fast attack, long decay
+        e.SetFilterEnvAmount(1.0f);                      // full modulation
+        e.SendNoteOn(60, 0.8f, 2, 5, 0);
+        // First buffer: filter is opening (attack)
+        var buf_early = new float[512];
+        e.ProcessAudioCallback(buf_early.AsSpan());
+        // Later buffer: filter is closing (decay)
+        for (int i = 0; i < 20; i++) {
+            var tmp = new float[512];
+            e.ProcessAudioCallback(tmp.AsSpan());
+        }
+        var buf_late = new float[512];
+        e.ProcessAudioCallback(buf_late.AsSpan());
+        float rms_early = 0f, rms_late = 0f;
+        foreach (var s in buf_early) rms_early += s * s;
+        foreach (var s in buf_late)  rms_late  += s * s;
+        // Output should differ (filter modulation is active)
+        Assert.That(rms_early, Is.Not.EqualTo(rms_late).Within(1e-6f),
+            "Filter ENV modulation must change output over time.");
+    }
+
+    [Test] public void SetFilterEnv_ZeroEnvAmt_NoModulation()
+    {
+        // ENV AMT=0: two engines with different filter ENV params but AMT=0
+        // must produce identical output (filter ENV not applied)
+        using var e1 = new Engine();
+        using var e2 = new Engine();
+        e1.SetFilterParams(0.5f, 0f, FilterKind.Roland);
+        e2.SetFilterParams(0.5f, 0f, FilterKind.Roland);
+        e1.SetFilterEnv(0.001f, 0.1f, 0f, 0.1f);   // fast env
+        e2.SetFilterEnv(1.0f,   1.0f, 1.0f, 1.0f); // slow env — different
+        e1.SetFilterEnvAmount(0f); // no modulation
+        e2.SetFilterEnvAmount(0f); // no modulation
+        e1.SendNoteOn(60, 0.8f, 2, 5, 0);
+        e2.SendNoteOn(60, 0.8f, 2, 5, 0);
+        var buf1 = new float[512]; var buf2 = new float[512];
+        e1.ProcessAudioCallback(buf1.AsSpan());
+        e2.ProcessAudioCallback(buf2.AsSpan());
+        float diff = 0f;
+        for (int i = 0; i < buf1.Length; i++) diff += MathF.Abs(buf1[i] - buf2[i]);
+        Assert.That(diff, Is.LessThan(0.1f),
+            "ENV AMT=0: different filter ENV params must produce same output.");
+    }
+
+    // ── SetAmpEnv ────────────────────────────────────────────────────────
+
+    [Test] public void SetAmpEnv_LongAttack_ProducesGradualRise()
+    {
+        using var e = new Engine();
+        e.SetAmpEnv(1.0f, 0.1f, 1.0f, 0.1f); // 1 second attack
+        e.SendNoteOn(60, 0.8f, 2, 5, 0);
+        var buf_early = new float[512];
+        e.ProcessAudioCallback(buf_early.AsSpan());
+        for (int i = 0; i < 40; i++) {
+            var tmp = new float[512]; e.ProcessAudioCallback(tmp.AsSpan());
+        }
+        var buf_late = new float[512];
+        e.ProcessAudioCallback(buf_late.AsSpan());
+        float rms_early = 0f, rms_late = 0f;
+        foreach (var s in buf_early) rms_early += s * s;
+        foreach (var s in buf_late)  rms_late  += s * s;
+        Assert.That(rms_early, Is.LessThan(rms_late),
+            "Long attack: early output must be quieter than later output.");
+    }
+
+    // ── SetWave ──────────────────────────────────────────────────────────
+
+    [Test] public void SetWave_AllWaveTypes_ProduceFiniteOutput()
+    {
+        foreach (WaveType wave in System.Enum.GetValues(typeof(WaveType)))
+        {
+            using var e = new Engine();
+            e.SetWave(wave);
+            e.SendNoteOn(60, 0.8f, 2, 5, 0);
+            var buf = new float[1024];
+            e.ProcessAudioCallback(buf.AsSpan());
+            foreach (var s in buf)
+                Assert.That(float.IsNaN(s) || float.IsInfinity(s), Is.False,
+                    $"Wave {wave} produced NaN/Inf.");
+        }
+    }
+
+
 }

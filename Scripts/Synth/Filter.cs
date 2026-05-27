@@ -46,7 +46,13 @@ public struct Filter {
         }
         // Slow path: recompute coefficients
         // exp(ln(1000) * cutoff) is identical to MathF.Pow(1000f, cutoff) but ~2x faster
-        float cutoff_hz = 20f * MathF.Exp(LN1000 * cutoff);
+        // Roland uses compressed curve (×0.5 exponent): same slider = lower Hz than Moog.
+        // This compensates for 12dB/oct vs 24dB/oct slope difference.
+        // Result: same perceived brightness at same slider position; Roland stays warmer.
+        // Moog:   cutoff=1.0 → ~20000Hz (fully open)
+        // Roland: cutoff=1.0 →   ~632Hz (warm, characteristically closed-top)
+        float cutoff_factor = mode == FilterKind.Roland ? cutoff * 0.5f : cutoff;
+        float cutoff_hz = 20f * MathF.Exp(LN1000 * cutoff_factor);
         float g = TWO_PI * cutoff_hz / sampleRate;
         if (g > 0.99f) g = 0.99f;
         _cutoff_g = g;
@@ -56,9 +62,11 @@ public struct Filter {
         _k = k;
         _mode = mode;
         // Kick-start self-oscillation on first high-resonance setup
-        if (mode == FilterKind.Moog && k > 3.5f && _s1 == 0f && _s2 == 0f && _s3 == 0f && _s4 == 0f) {
+        // Kick-start self-oscillation for both filter types
+        if (mode == FilterKind.Moog && k > 3.5f && _s1 == 0f && _s2 == 0f && _s3 == 0f && _s4 == 0f)
             _s1 = 0.05f;
-        }
+        if (mode == FilterKind.Roland && k > 3.5f && _s1 == 0f && _s2 == 0f && _s3 == 0f && _s4 == 0f)
+            _s1 = 0.05f;
         // Cache result
         _cached_cutoff    = cutoff;
         _cached_resonance = resonance;
@@ -106,10 +114,18 @@ public struct Filter {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private float ProcessRoland(float input) {
-        // Simple two-pole with resonance feedback (Juno-106 style)
-        _s1 += _cutoff_g * (input - _s1 + _k * 0.25f * (_s1 - _s2));
+        // IR3109-style: 4-pole ladder with feedback from stage 4,
+        // output tapped from stage 2 (-12dB/oct slope, Juno-106 character).
+        // Feedback from _s4 (full ladder) allows self-oscillation same as Moog.
+        float u = input - _k * _s4;
+        _s1 += _cutoff_g * (u  - _s1);
         _s2 += _cutoff_g * (_s1 - _s2);
-        return _s2;
+        _s3 += _cutoff_g * (_s2 - _s3);
+        _s4 += _cutoff_g * (_s3 - _s4);
+        // Clamp full ladder state
+        if      (_s4 >  1.9f) _s4 =  1.9f;
+        else if (_s4 < -1.9f) _s4 = -1.9f;
+        return _s2;   // 2-pole tap = -12dB/oct Roland character
     }
 
     public void Reset() {

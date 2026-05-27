@@ -46,7 +46,7 @@ public class VoicesTests
             vm.NoteOn(MakeNote(60 + i, i % 8), DefaultOsc(), DefaultOsc(),
                 EnvParams.Default, EnvParams.Default, EnvParams.Default);
         vm.AllNotesOff();
-        // AllNotesOff 後は QuickRelease → 発音は残るが新規割り当て可能
+        // After AllNotesOff: voices enter QuickRelease — still audible but reassignable
         Assert.DoesNotThrow(() => vm.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             EnvParams.Default, EnvParams.Default, EnvParams.Default));
     }
@@ -300,12 +300,12 @@ public class VoicesTests
 
     [Test] public void DrumTrack_NoteIsNeverStolenByOtherTrack()
     {
-        // ドラムトラック（0）は他トラックから Steal されないことを確認。
-        // ActiveVoices の数だけ見てもドラムボイスが入れ替わっている可能性があるため、
-        // IsNoteActive() で「ドラムのノートが生き残っているか」を直接検証する。
-        var vm = new Voices(4, 44100); // 極小ボイス数で Steal を誘発
+        // Verify that drum track (0) cannot be stolen by other tracks.
+        // Checking ActiveVoices count alone is insufficient — a drum voice may have been
+        // replaced. Use IsNoteActive() to verify drum notes are still alive.
+        var vm = new Voices(4, 44100); // Tiny voice pool to force stealing
 
-        // ドラムトラックに全ボイスを埋める
+        // Fill all voices with drum track notes
         int[] drumNotes = { 60, 61, 62, 63 };
         foreach (int n in drumNotes)
             vm.NoteOn(new Note(n, 0.8f, 0, 10), // Protected track
@@ -313,14 +313,110 @@ public class VoicesTests
                 new EnvParams(0.001f, 0.1f, 1.0f, 1.0f),
                 EnvParams.Default, EnvParams.Default);
 
-        // 非ドラムトラックからの NoteOn は Protected ボイスを奪えない
+        // NoteOn from non-drum track must not steal Protected voices
         vm.NoteOn(new Note(72, 0.8f, 2, 1), // Low priority non-drum
             DefaultOsc(), DefaultOsc(),
             EnvParams.Default, EnvParams.Default, EnvParams.Default);
 
-        // ドラムのノートがすべて生き残っていること
+        // All drum notes must survive
         foreach (int n in drumNotes)
             Assert.That(vm.IsNoteActive(n, 0), Is.True,
                 $"Drum note {n} was stolen — Protected flag not respected.");
     }
+
+    // ── SetOscLevels ─────────────────────────────────────────────────────
+
+    [Test] public void SetOscLevels_Osc1Zero_ReducesOutput()
+    {
+        var vm = new Voices(4, 44100);
+        vm.SetOscLevels(0f, 0f, 0f);
+        vm.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            EnvParams.Default, EnvParams.Default, EnvParams.Default);
+        var buf = new float[512];
+        vm.RenderSamples(buf.AsSpan(), 1);
+        float rms = 0f;
+        foreach (var s in buf) rms += s * s;
+        Assert.That(rms, Is.LessThan(1e-4f),
+            "OSC1+OSC2 level=0 must produce near-silence.");
+    }
+
+    [Test] public void SetOscLevels_Clamps_OutOfRange()
+    {
+        var vm = new Voices(4, 44100);
+        Assert.DoesNotThrow(() => vm.SetOscLevels(-1f, 2f, 200f),
+            "SetOscLevels must clamp out-of-range values without throwing.");
+    }
+
+    [Test] public void SetOscLevels_ImmediateEffect_OnActiveVoice()
+    {
+        // SetOscLevels must affect currently-playing voices immediately
+        var vm = new Voices(4, 44100);
+        vm.SetOscLevels(1.0f, 1.0f, 0f);
+        vm.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            EnvParams.Default, EnvParams.Default, EnvParams.Default);
+        var buf1 = new float[512];
+        vm.RenderSamples(buf1.AsSpan(), 1);
+        // Now reduce level
+        vm.SetOscLevels(0f, 0f, 0f);
+        var buf2 = new float[512];
+        vm.RenderSamples(buf2.AsSpan(), 1);
+        float rms1 = 0f, rms2 = 0f;
+        foreach (var s in buf1) rms1 += s * s;
+        foreach (var s in buf2) rms2 += s * s;
+        Assert.That(rms2, Is.LessThan(rms1),
+            "SetOscLevels must take effect immediately on active voices.");
+    }
+
+    // ── SetFilterEnv ─────────────────────────────────────────────────────
+
+    [Test] public void SetFilterEnv_DoesNotThrow()
+    {
+        var vm = new Voices(4, 44100);
+        Assert.DoesNotThrow(() => vm.SetFilterEnv(0.01f, 0.3f, 0f, 0.2f));
+    }
+
+    [Test] public void SetFilterEnv_AppliedOnNextNoteOn()
+    {
+        var vm = new Voices(4, 44100);
+        vm.SetFilterParams(0.2f, 0f, FilterKind.Roland);
+        vm.SetFilterEnv(0.001f, 0.5f, 0f, 0.1f);
+        vm.SetFilterEnvAmount(1.0f);
+        vm.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            EnvParams.Default, EnvParams.Default, EnvParams.Default);
+        var buf = new float[512];
+        Assert.DoesNotThrow(() => vm.RenderSamples(buf.AsSpan(), 1),
+            "SetFilterEnv must not cause exceptions during rendering.");
+    }
+
+    // ── SetFilterEnvAmount ────────────────────────────────────────────────
+
+    [Test] public void SetFilterEnvAmount_Zero_NoModulation()
+    {
+        var vm1 = new Voices(4, 44100);
+        var vm2 = new Voices(4, 44100);
+        vm1.SetFilterEnvAmount(0f);
+        vm2.SetFilterEnvAmount(0f);
+        vm1.SetFilterEnv(0.001f, 0.1f, 0f, 0.1f);
+        vm2.SetFilterEnv(0.001f, 0.1f, 0f, 0.1f);
+        vm1.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            EnvParams.Default, EnvParams.Default, EnvParams.Default);
+        vm2.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            EnvParams.Default, EnvParams.Default, EnvParams.Default);
+        var buf1 = new float[1024]; var buf2 = new float[1024];
+        vm1.RenderSamples(buf1.AsSpan(), 1);
+        vm2.RenderSamples(buf2.AsSpan(), 1);
+        float diff = 0f;
+        for (int i = 0; i < buf1.Length; i++) diff += MathF.Abs(buf1[i] - buf2[i]);
+        Assert.That(diff, Is.LessThan(1e-4f),
+            "Two voices with ENV AMT=0 and same params must produce identical output.");
+    }
+
+    [Test] public void SetFilterEnvAmount_Clamps_OutOfRange()
+    {
+        var vm = new Voices(4, 44100);
+        Assert.DoesNotThrow(() => vm.SetFilterEnvAmount(-1f));
+        Assert.DoesNotThrow(() => vm.SetFilterEnvAmount(2f));
+    }
+
+
 }

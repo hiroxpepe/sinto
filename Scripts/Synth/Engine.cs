@@ -19,6 +19,11 @@ public sealed class Engine : IDisposable {
     private int   _paused;
     private float _current_bpm;
     private long  _dsp_time_samples;
+    private WaveType _current_wave  = WaveType.Saw;
+    private float    _osc1_level     = 1.0f;
+    private float    _osc2_level     = 0.5f;
+    private float    _detune_cents   = 0f;
+    private EnvParams _current_amp_env = EnvParams.Default;
 
     public int   ActiveVoices     => _voices.ActiveVoices;
     public int   CurrentMaxVoices => _scaler.CurrentMaxVoices;
@@ -56,6 +61,33 @@ public sealed class Engine : IDisposable {
         return _event_queue.TryEnqueue(new Event(
             EventKind.NoteOff, offsetFrames, midiNote, 0f, trackId, 0));
     }
+
+    /// <summary>Set the waveform used for new NoteOn events (audition / live tweaking).</summary>
+    public void SetWave(WaveType wave) => _current_wave = wave;
+
+    /// <summary>Set OSC levels and OSC2 detune.</summary>
+    public void SetOscParams(float osc1Level, float osc2Level, float detuneCents) {
+        _osc1_level   = osc1Level;
+        _osc2_level   = osc2Level;
+        _detune_cents = detuneCents;
+        // 鳴っている voice に即時反映
+        _voices.SetOscLevels(osc1Level, osc2Level, detuneCents);
+    }
+
+    /// <summary>Set filter cutoff/resonance for all voices.</summary>
+    public void SetFilterParams(float cutoff, float resonance, FilterKind mode)
+        => _voices.SetFilterParams(cutoff, resonance, mode);
+
+    /// <summary>Set filter envelope amount (how much the filter envelope modulates cutoff).</summary>
+    /// <summary>Set VCF dedicated filter envelope ADSR.</summary>
+    public void SetFilterEnv(float attack, float decay, float sustain, float release)
+        => _voices.SetFilterEnv(attack, decay, sustain, release);
+
+    public void SetFilterEnvAmount(float amount) => _voices.SetFilterEnvAmount(amount);
+
+    /// <summary>Set amp envelope ADSR for new NoteOn events.</summary>
+    public void SetAmpEnv(float attack, float decay, float sustain, float release)
+        => _current_amp_env = new EnvParams(attack, decay, sustain, release);
 
     public void Pause() {
         // Set _paused immediately for IsPaused check
@@ -116,7 +148,7 @@ public sealed class Engine : IDisposable {
             case EventKind.NoteOn:
                 _voices.NoteOn(
                     new Note(ev.IntParam, ev.FloatParam, ev.TrackId, ev.Priority),
-                    new OscParams(WaveType.Sine), new OscParams(WaveType.Sine),
+                    new OscParams(_current_wave), new OscParams(_current_wave),
                     EnvParams.Default, EnvParams.Default, EnvParams.Default);
                 break;
             case EventKind.NoteOff:

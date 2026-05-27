@@ -31,6 +31,10 @@ public struct Voice {
     public EnvParams  FilterEnvParams;
     public EnvParams  PitchEnvParams;
     public FilterKind FilterMode;
+    public float Osc1MasterLevel;
+    public float Osc2MasterLevel;
+    public float FilterEnvAmount; // 0 = no env modulation on cutoff
+    public float PitchEnvAmount;  // 0 = no env modulation on pitch (default)
     private int  _sample_rate;
     private long _sample_index;
     // Frequency cache — only call SetFrequency when freq changes by meaningful amount
@@ -66,6 +70,8 @@ public struct Voice {
         AmpEnvelope.NoteOn(ampP, sampleRate);
         FilterEnvelope.NoteOn(filterP, sampleRate);
         PitchEnvelope.NoteOn(pitchP, sampleRate);
+        // Reset filter state — prevents previous note's residue affecting attack
+        Filter.Reset();
         // Snap smoothers — prevents "pyun" artifact on voice steal
         SmoothedCutoff.SnapToTarget();
         SmoothedResonance.SnapToTarget();
@@ -94,9 +100,9 @@ public struct Voice {
         if (State == PlayState.Free) return 0f;
         int sr = _sample_rate > 0 ? _sample_rate : 44100;
 
-        // ── Smoother ターゲット更新 ──────────────────────────────────────
-        // ここが重要: ノブ値を Smoother に毎サンプル設定する
-        // Smoother が IIR で滑らかに追従 → ジッパーノイズなし
+        // ── Smoother target update ───────────────────────────────────────
+        // Critical: set knob value into Smoother every sample
+        // Smoother IIR follows smoothly → no zipper noise
         SmoothedCutoff.SetTarget(filterCutoffBase);
         SmoothedResonance.SetTarget(filterResonanceBase);
 
@@ -104,15 +110,17 @@ public struct Voice {
         float freq = Portamento.Tick();
         if (freq < 1f) freq = ActiveNote.FrequencyHz;
 
-        // ── Pitch: EnvelopeとLFO ────────────────────────────────────────
-        float pitch_env  = PitchEnvelope.Tick();
+        // ── Pitch: Envelope and LFO ─────────────────────────────────────
+        // PitchEnvelope: always tick, scaled by PitchEnvAmount.
+        // PitchEnvAmount=0 (default) = no pitch modulation = no pitch drop on NoteOff
+        float pitch_env = PitchEnvelope.Tick() * PitchEnvAmount;
         float lfo1_pitch = (lfo1Params.Destinations & LfoTarget.OSC1Pitch) != 0
                            ? lfo1Output * lfo1Params.Depth * 2f : 0f;
         float lfo2_pitch = (lfo2Params.Destinations & LfoTarget.OSC2Pitch) != 0
                            ? lfo2Output * lfo2Params.Depth * 2f : 0f;
-        float total_pitch = pitch_env * 0.5f + lfo1_pitch + lfo2_pitch;
+        float total_pitch = pitch_env + lfo1_pitch + lfo2_pitch;
 
-        // OSC frequency — SetFrequency は ΔHz > 0.05Hz のときのみ（マイクロ変化で毎サンプル呼ばない）
+        // OSC frequency — only call SetFrequency when ΔHz > 0.05 (skip micro-changes)
         float freq1 = freq * Calc.PitchRatioFast(total_pitch + Osc1Params.DetuneCents / 100f);
         float freq2 = freq * Calc.PitchRatioFast(total_pitch + Osc2Params.DetuneCents / 100f);
         if (freq1 < 1f) freq1 = 1f;
@@ -130,25 +138,26 @@ public struct Voice {
             else if (pw > 0.95f) pw = 0.95f;
             p1 = new OscParams(p1.Wave, p1.Interp, p1.DetuneCents, pw, p1.Level);
         }
-        float o1  = Osc1.Tick(p1);
-        float o2  = Osc2.Tick(Osc2Params);
+        float o1  = Osc1.Tick(p1) * Osc1MasterLevel;
+        float o2  = Osc2.Tick(Osc2Params) * Osc2MasterLevel;
         float mix = (o1 + o2) * 0.5f;
 
         // ── Filter ──────────────────────────────────────────────────────
         float filter_env = FilterEnvelope.Tick();
-        // Smoother を Tick して現在値取得（毎サンプル滑らかに変化）
+        // Tick Smoother to get current value (changes smoothly every sample)
         float cutoff    = SmoothedCutoff.Tick();
         float resonance = SmoothedResonance.Tick();
-        // Envelope / LFO でカットオフを変調
-        cutoff += filter_env * 0.5f;
+        // Modulate cutoff via Envelope / LFO
+        // NOTE: filter_env amount controlled by FilterEnvAmount field (0 = no modulation)
+        cutoff += filter_env * FilterEnvAmount;
         if ((lfo1Params.Destinations & LfoTarget.FilterCutoff) != 0)
             cutoff += lfo1Output * lfo1Params.Depth * 0.3f;
         if ((lfo2Params.Destinations & LfoTarget.FilterCutoff) != 0)
             cutoff += lfo2Output * lfo2Params.Depth * 0.3f;
         if      (cutoff < 0.001f) cutoff = 0.001f;
         else if (cutoff > 0.999f) cutoff = 0.999f;
-        // SetParams は毎サンプル呼ぶ — Smoother が既に滑らかにしてくれてるため
-        // 閾値ゲートは不要（= ジッパーノイズの原因になる）
+        // Call SetParams every sample — Smoother already ensures smooth changes
+        // No threshold gate needed (a gate would cause zipper noise)
         Filter.SetParams(cutoff, resonance, FilterMode, sr);
         float filtered = Filter.Process(mix, _sample_index);
 

@@ -81,7 +81,7 @@ public class DenormalTests
     [Test]
     public void Protect_NoStaticState_ThreadSafe()
     {
-        // 8スレッドが同時に呼んでもデータレースが起きないこと
+        // 8 threads calling simultaneously must not cause data races
         var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
         var tasks = new Task[8];
         for (int t = 0; t < 8; t++) {

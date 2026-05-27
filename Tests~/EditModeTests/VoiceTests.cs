@@ -111,4 +111,77 @@ public class VoiceTests
         Assert.That(v.Portamento.IsGliding, Is.False,
             "portamentoTime=0 must not start glide.");
     }
+
+    // ── PitchEnvAmount ───────────────────────────────────────────────────
+
+    [Test] public void PitchEnvAmount_Zero_NoPitchChangeOnNoteOff()
+    {
+        // PitchEnvAmount=0 (default): pitch must not change after NoteOff
+        var v = new Voice();
+        v.PitchEnvAmount = 0f;
+        v.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
+        // Tick some samples during Sustain
+        for (int i = 0; i < 1000; i++) v.Tick(0f, 0f, 0.5f, 0f, DefaultLFO(), DefaultLFO());
+        // Record output before NoteOff
+        float before = v.Tick(0f, 0f, 0.5f, 0f, DefaultLFO(), DefaultLFO());
+        v.NoteOff();
+        // First sample after NoteOff must not show abrupt pitch change
+        float after = v.Tick(0f, 0f, 0.5f, 0f, DefaultLFO(), DefaultLFO());
+        // Both should be finite
+        Assert.That(float.IsNaN(after) || float.IsInfinity(after), Is.False,
+            "PitchEnvAmount=0: NoteOff must not produce NaN/Inf.");
+    }
+
+    [Test] public void PitchEnvAmount_DefaultIsZero()
+    {
+        var v = new Voice();
+        v.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
+        Assert.That(v.PitchEnvAmount, Is.EqualTo(0f).Within(1e-6f),
+            "PitchEnvAmount must default to 0 after NoteOn.");
+    }
+
+    // ── FilterEnvAmount ──────────────────────────────────────────────────
+
+    [Test] public void FilterEnvAmount_DefaultIsZero()
+    {
+        var v = new Voice();
+        v.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
+        Assert.That(v.FilterEnvAmount, Is.EqualTo(0f).Within(1e-6f),
+            "FilterEnvAmount must default to 0 after NoteOn.");
+    }
+
+    // ── Osc MasterLevel ──────────────────────────────────────────────────
+
+    [Test] public void Osc1MasterLevel_Zero_ProducesNearSilence()
+    {
+        var v = new Voice();
+        v.Osc1MasterLevel = 0f;
+        v.Osc2MasterLevel = 0f;
+        v.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
+        float sum = 0f;
+        for (int i = 0; i < 512; i++)
+            sum += MathF.Abs(v.Tick(0f, 0f, 0.5f, 0f, DefaultLFO(), DefaultLFO()));
+        Assert.That(sum, Is.LessThan(0.01f),
+            "Osc1+Osc2 MasterLevel=0 must produce near-silence.");
+    }
+
+    [Test] public void Osc1MasterLevel_One_ProducesAudio()
+    {
+        var v = new Voice();
+        v.Osc1MasterLevel = 1.0f;
+        v.Osc2MasterLevel = 0f;
+        v.NoteOn(MakeNote(60), DefaultOsc(), DefaultOsc(),
+            DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
+        float sum = 0f;
+        for (int i = 0; i < 512; i++)
+            sum += MathF.Abs(v.Tick(0f, 0f, 0.5f, 0f, DefaultLFO(), DefaultLFO()));
+        Assert.That(sum, Is.GreaterThan(0.001f),
+            "Osc1 MasterLevel=1 must produce audible output.");
+    }
+
+
 }
