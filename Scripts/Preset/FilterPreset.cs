@@ -1,11 +1,11 @@
 #nullable enable
-using Sinto.Core.Filter;
+using Sinto.Core.Synth;
 
 namespace Sinto.Core.Preset;
 
 public sealed class FilterPreset
 {
-    public FilterMode Mode      { get; init; } = FilterMode.Roland;
+    public FilterKind Mode      { get; init; } = FilterKind.Roland;
     public float      Cutoff    { get; init; } = 1.0f;   // [0.001, 0.999]
     public float      Resonance { get; init; } = 0.0f;   // [0.0, 1.0]
     public float      EnvAmt    { get; init; } = 0.0f;   // [-1.0, +1.0]

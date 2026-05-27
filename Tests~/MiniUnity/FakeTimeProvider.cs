@@ -8,7 +8,7 @@ namespace Sinto.Core.Synth;
 /// Deterministic time provider for unit tests.
 /// Never use Thread.Sleep to simulate elapsed time — use Advance() instead.
 /// </summary>
-public sealed class FakeTimeProvider : ITimeProvider {
+public sealed class FakeTimeProvider : ITimer {
     private long _current = 0;
 
     // Simulate Stopwatch.Frequency (ticks per second)

@@ -2,25 +2,25 @@
 // Licensed under the MIT License.
 #nullable enable
 using System.Runtime.CompilerServices;
-using Sinto.Core.Filter;
+using Sinto.Core.Synth;
 
 namespace Sinto.Core.Synth;
 
 public struct Voice {
     public Note           ActiveNote;
-    public VoiceState     State;
+    public PlayState     State;
     public int            VoiceIndex;
-    public OscillatorState Osc1;
-    public OscillatorState Osc2;
-    public EnvelopeState  AmpEnvelope;
-    public EnvelopeState  FilterEnvelope;
-    public EnvelopeState  PitchEnvelope;
-    public FilterState    Filter;
-    public SmoothedParameter SmoothedCutoff;
-    public SmoothedParameter SmoothedResonance;
-    public SmoothedParameter SmoothedAmpLevel;
-    public SmoothedParameter SmoothedPitchMod;
-    public PortamentoState Portamento;
+    public Oscillator Osc1;
+    public Oscillator Osc2;
+    public Envelope  AmpEnvelope;
+    public Envelope  FilterEnvelope;
+    public Envelope  PitchEnvelope;
+    public Filter    Filter;
+    public Smoother SmoothedCutoff;
+    public Smoother SmoothedResonance;
+    public Smoother SmoothedAmpLevel;
+    public Smoother SmoothedPitchMod;
+    public Portamento Portamento;
     public int            QuickReleaseSamplesRemaining;
     // IsKeyHeld: true = physical key is still pressed.
     // Required for correct Sustain Pedal behavior:
@@ -28,23 +28,23 @@ public struct Voice {
     //   Pedal release → only voices with IsKeyHeld=false transition to Release.
     //   Without this flag, releasing pedal kills notes that are still physically held.
     public bool IsKeyHeld;
-    // Preset parameters are shared across all voices via SintoEngine._activePreset.
-    // DO NOT embed LFOParams/OscillatorParams/EnvelopeParams per-voice.
-    // 32 voices × (LFOParams + OscillatorParams×2 + EnvelopeParams×3) wastes L1 cache.
+    // Preset parameters are shared across all voices via Engine._activePreset.
+    // DO NOT embed LfoParams/OscParams/EnvParams per-voice.
+    // 32 voices × (LfoParams + OscParams×2 + EnvParams×3) wastes L1 cache.
     // Each voice only needs a reference index into the shared preset.
-    // Parameters are read from SintoEngine._activePreset during Tick().
-    // Exception: EnvelopeState is per-voice (runtime state, not preset data).
+    // Parameters are read from Engine._activePreset during Tick().
+    // Exception: Envelope is per-voice (runtime state, not preset data).
     // Temporarily kept for Phase 1 stub — Phase 2 refactors to preset reference.
-    public OscillatorParams Osc1Params;   // TODO Phase 2: remove, read from preset
-    public OscillatorParams Osc2Params;   // TODO Phase 2: remove, read from preset
-    public EnvelopeParams AmpEnvParams;   // TODO Phase 2: remove, read from preset
-    public EnvelopeParams FilterEnvParams;// TODO Phase 2: remove, read from preset
-    public EnvelopeParams PitchEnvParams; // TODO Phase 2: remove, read from preset
+    public OscParams Osc1Params;   // TODO Phase 2: remove, read from preset
+    public OscParams Osc2Params;   // TODO Phase 2: remove, read from preset
+    public EnvParams AmpEnvParams;   // TODO Phase 2: remove, read from preset
+    public EnvParams FilterEnvParams;// TODO Phase 2: remove, read from preset
+    public EnvParams PitchEnvParams; // TODO Phase 2: remove, read from preset
 
     public float CurrentAmplitude => throw new System.NotImplementedException();
 
-    public void NoteOn(in Note note, in OscillatorParams osc1p, in OscillatorParams osc2p,
-        in EnvelopeParams ampP, in EnvelopeParams filterP, in EnvelopeParams pitchP,
+    public void NoteOn(in Note note, in OscParams osc1p, in OscParams osc2p,
+        in EnvParams ampP, in EnvParams filterP, in EnvParams pitchP,
         float portamentoTime, int sampleRate)
         => throw new System.NotImplementedException();
 
@@ -57,6 +57,6 @@ public struct Voice {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Tick(float lfo1Output, float lfo2Output,
         float filterCutoffBase, float filterResonanceBase,
-        in LFOParams lfo1Params, in LFOParams lfo2Params)
+        in LfoParams lfo1Params, in LfoParams lfo2Params)
         => throw new System.NotImplementedException();
 }

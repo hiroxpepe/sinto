@@ -12,9 +12,9 @@ public class VoiceTests
 {
     const int SR = 44100;
 
-    static OscillatorParams DefaultOsc()  => new(WaveType.Sine);
-    static EnvelopeParams   DefaultEnv()  => EnvelopeParams.Default;
-    static LFOParams        DefaultLFO()  => new(LFOWave.Sine, 1.0f, 0.0f, false);
+    static OscParams DefaultOsc()  => new(WaveType.Sine);
+    static EnvParams   DefaultEnv()  => EnvParams.Default;
+    static LfoParams        DefaultLFO()  => new(LfoWave.Sine, 1.0f, 0.0f, false);
     static Note             MakeNote(int midi = 60)
         => new(midi, 0.8f, 2, 5);
 
@@ -24,7 +24,7 @@ public class VoiceTests
     [Test] public void Initial_State_IsFree()
     {
         var v = new Voice();
-        Assert.That(v.State, Is.EqualTo(VoiceState.Free));
+        Assert.That(v.State, Is.EqualTo(PlayState.Free));
     }
 
     [Test] public void NoteOn_StateBecomesAttack()
@@ -32,7 +32,7 @@ public class VoiceTests
         var v = new Voice();
         v.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
-        Assert.That(v.State, Is.Not.EqualTo(VoiceState.Free),
+        Assert.That(v.State, Is.Not.EqualTo(PlayState.Free),
             "After NoteOn, voice must not be Free.");
     }
 
@@ -45,9 +45,9 @@ public class VoiceTests
         Assert.That(v.ActiveNote.MidiNote, Is.EqualTo(69));
     }
 
-    [Test] public void NoteOn_SnapsAllSmoothedParameters()
+    [Test] public void NoteOn_SnapsAllSmoothers()
     {
-        // After NoteOn, SmoothedParameter.Current must equal Target immediately.
+        // After NoteOn, Smoother.Current must equal Target immediately.
         // If SnapToTarget() is not called, previous voice state leaks → "pyun" artifact.
         var v = new Voice();
         v.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
@@ -64,7 +64,7 @@ public class VoiceTests
         v.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
         v.NoteOff();
-        Assert.That(v.State, Is.EqualTo(VoiceState.Release));
+        Assert.That(v.State, Is.EqualTo(PlayState.Release));
     }
 
     [Test] public void StartQuickRelease_StateBecomesQuickRelease()
@@ -73,7 +73,7 @@ public class VoiceTests
         v.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
         v.StartQuickRelease(SR);
-        Assert.That(v.State, Is.EqualTo(VoiceState.QuickRelease));
+        Assert.That(v.State, Is.EqualTo(PlayState.QuickRelease));
     }
 
     [Test] public void Tick_ProducesFiniteOutput()
