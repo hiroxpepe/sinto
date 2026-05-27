@@ -10,24 +10,43 @@ namespace Sinto.Tests.Audio;
 public class DenormalGuardTests
 {
     [Test]
-    public void Protect_EvenIndex_ReturnsPositiveOffset()
+    public void Protect_FirstCycle_ReturnsPositiveOffset()
     {
+        // sampleIndex 0..255 → first 256-sample cycle → positive
         float result = DenormalGuard.Protect(0.0f, 0L);
         Assert.That(result, Is.GreaterThan(0f));
     }
 
     [Test]
-    public void Protect_OddIndex_ReturnsNegativeOffset()
+    public void Protect_SecondCycle_ReturnsNegativeOffset()
     {
-        float result = DenormalGuard.Protect(0.0f, 1L);
+        // sampleIndex 256..511 → second cycle → negative
+        float result = DenormalGuard.Protect(0.0f, 256L);
         Assert.That(result, Is.LessThan(0f));
+    }
+
+    [Test]
+    public void Protect_SignFlipsEvery256Samples_NotEverySample()
+    {
+        // Per-sample alternation = Nyquist frequency = filtered out by LPF → subnormal survives.
+        // Must flip every 256 samples to survive low-pass filtering.
+        float first  = DenormalGuard.Protect(0.0f, 0L);
+        float second = DenormalGuard.Protect(0.0f, 1L);
+        // Within the same 256-sample cycle, sign must be SAME (not flipped)
+        Assert.That(System.Math.Sign(first), Is.EqualTo(System.Math.Sign(second)),
+            "Sign must NOT flip every sample (Nyquist problem). Must flip every 256 samples.");
+        // After 256 samples, sign must flip
+        float after256 = DenormalGuard.Protect(0.0f, 256L);
+        Assert.That(System.Math.Sign(first), Is.Not.EqualTo(System.Math.Sign(after256)),
+            "Sign must flip after 256 samples.");
     }
 
     [Test]
     public void Protect_AlternatingSigns_CancelDCBias()
     {
+        // Must sum to zero over complete cycles (512 samples = 2 full cycles)
         double sum = 0;
-        for (long i = 0; i < 1000; i++)
+        for (long i = 0; i < 512; i++)
             sum += DenormalGuard.Protect(0.0f, i);
         Assert.That(sum, Is.EqualTo(0.0).Within(1e-12));
     }

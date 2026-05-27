@@ -17,6 +17,12 @@ public enum ControlEventKind : byte {
     SustainPedal = 8,  // CC64: FloatParam=1.0 down, 0.0 up
 }
 
+// PACKING NOTE:
+// [StructLayout(LayoutKind.Sequential, Pack = 1)] would give exact 19-byte size,
+// but Pack=1 can cause misaligned memory access on ARM (Unity IL2CPP warning).
+// LayoutKind.Sequential (default pack) adds ~1 byte padding → ~20 bytes.
+// This is acceptable: 20 bytes fits easily in a cache line (64 bytes).
+// Do NOT use Pack=1 unless profiling proves it necessary on target hardware.
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct ControlEvent : System.IEquatable<ControlEvent> {
     public readonly ControlEventKind Kind;

@@ -7,7 +7,11 @@ namespace Sinto.Core.Synth;
 
 public sealed class VoiceScaler {
     private static readonly int[] Tiers = { 32, 24, 16 };
-    private const float DownThreshold    = 0.70f;
+    private const float DownThreshold         = 0.70f;
+    private const int   ConsecutiveOverloadRequired = 3; // Must exceed threshold N times in a row
+    // Single-frame spikes (GC, OS scheduler, touch event) must NOT trigger TierDown.
+    // Mobile: even a simple screen touch can cause a 1-frame audio callback delay.
+    // Solution: only TierDown after N consecutive overloads (default 3 = ~35ms at 512/44100).
     private const float UpThreshold      = 0.40f;
     private const int   CooldownCallbacks = 64;
     private const int   HeadroomCallbacks = 300;
@@ -16,6 +20,7 @@ public sealed class VoiceScaler {
     private readonly ITimeProvider _time;   // injected for testability
     private int  _currentTierIndex;
     private int  _cooldownRemaining;
+    private int  _consecutiveOverload;  // consecutive frames above DownThreshold
     private int  _consecutiveHeadroom;
     private long _callbackStartTick;
 

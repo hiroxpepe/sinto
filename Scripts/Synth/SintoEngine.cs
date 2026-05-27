@@ -33,8 +33,27 @@ public sealed class SintoEngine : IDisposable {
     public bool SendNoteOff(int midiNote, int trackId, ushort offsetFrames)
         => throw new NotImplementedException();
 
-    public void Pause()  => throw new NotImplementedException();
-    public void Resume() => throw new NotImplementedException();
+    // PAUSE/RESUME DESIGN — must use ring buffer ONLY, NOT Interlocked flag:
+    //
+    // Problem with dual-state (Interlocked + ring buffer):
+    //   Interlocked sets _paused=1 instantly, but ring buffer Pause event arrives later.
+    //   Audio thread sees Interlocked=1 mid-buffer → stops at wrong position.
+    //   Resume restores Interlocked=0, but ring buffer Resume event may arrive earlier/later.
+    //   → Race condition: resume fires before pause completes, or vice versa.
+    //
+    // Correct: Pause()/Resume() enqueue ONLY a ring buffer event.
+    //   Audio thread processes event at exact OffsetFrames position.
+    //   Sample-accurate pause/resume, no dual-state race.
+    public void Pause()
+    {
+        // Enqueue Pause event — do NOT use Interlocked._paused directly
+        _eventQueue.TryEnqueue(new ControlEvent(ControlEventKind.Pause));
+    }
+    public void Resume()
+    {
+        // Enqueue Resume event — sample-accurate, no race with Interlocked
+        _eventQueue.TryEnqueue(new ControlEvent(ControlEventKind.Resume));
+    }
     public void SetBPM(float bpm) => throw new NotImplementedException();
 
     public void RequestPresetSwap(object newPreset)

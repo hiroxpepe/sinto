@@ -18,11 +18,10 @@ public class BBDChorusTests
     {
         var c = new BBDChorus(44100);
         c.Mix = 1.0f; c.Enabled = true;
-        var buf = new float[1024]; // all zeros
+        var buf = new float[1024];
         c.Process(buf.AsSpan(), 2);
         foreach (float s in buf)
-            Assert.That(MathF.Abs(s), Is.LessThan(0.01f),
-                "Silent input through chorus must produce near-silent output.");
+            Assert.That(MathF.Abs(s), Is.LessThan(0.01f));
     }
 
     [Test] public void Process_OutputIsFinite()
@@ -42,16 +41,29 @@ public class BBDChorusTests
         var c2 = new BBDChorus(44100);
         c1.Mix = 1.0f; c1.Enabled = true;
         c2.Mix = 1.0f; c2.Enabled = true;
-
         var buf1 = new float[512];
         var buf2 = new float[512];
         for (int i = 0; i < 512; i++) buf1[i] = 0.5f;
         c1.Process(buf1.AsSpan(), 2);
-        c2.Process(buf2.AsSpan(), 2); // silent
-
+        c2.Process(buf2.AsSpan(), 2);
         bool c2IsSilent = buf2.All(s => MathF.Abs(s) < 0.05f);
         Assert.That(c2IsSilent, Is.True,
             "BBDChorus instances must have independent buffers (not static).");
+    }
+
+    [Test] public void Reset_ClearsBuffer()
+    {
+        var c = new BBDChorus(44100);
+        c.Mix = 1.0f; c.Enabled = true;
+        var fillBuf = new float[1024];
+        for (int i = 0; i < fillBuf.Length; i++) fillBuf[i] = 0.8f;
+        c.Process(fillBuf.AsSpan(), 2);
+        c.Reset();
+        var silentBuf = new float[1024];
+        c.Process(silentBuf.AsSpan(), 2);
+        foreach (float s in silentBuf)
+            Assert.That(MathF.Abs(s), Is.LessThan(0.01f),
+                "After Reset(), BBDChorus must output silence for silent input.");
     }
 }
 
@@ -68,8 +80,7 @@ public class FreeverbReverbTests
         var buf = new float[1024];
         r.Process(buf.AsSpan(), 2);
         foreach (float s in buf)
-            Assert.That(MathF.Abs(s), Is.LessThan(0.01f),
-                "Silent input through reverb must produce near-silent output.");
+            Assert.That(MathF.Abs(s), Is.LessThan(0.01f));
     }
 
     [Test] public void Process_OutputIsFinite()
@@ -81,6 +92,21 @@ public class FreeverbReverbTests
         r.Process(buf.AsSpan(), 2);
         foreach (float s in buf)
             Assert.That(float.IsNaN(s) || float.IsInfinity(s), Is.False);
+    }
+
+    [Test] public void Reset_DoesNotContinueReverbTail()
+    {
+        var r = new FreeverbReverb();
+        r.RoomSize = 0.9f; r.Mix = 1.0f; r.Enabled = true;
+        var fillBuf = new float[44100];
+        for (int i = 0; i < fillBuf.Length; i++) fillBuf[i] = 0.5f;
+        r.Process(fillBuf.AsSpan(), 2);
+        r.Reset();
+        var silentBuf = new float[1024];
+        r.Process(silentBuf.AsSpan(), 2);
+        foreach (float s in silentBuf)
+            Assert.That(MathF.Abs(s), Is.LessThan(0.05f),
+                "After Reset(), Freeverb must not continue reverb tail.");
     }
 }
 
@@ -99,37 +125,50 @@ public class EffectsChainTests
 
     [Test] public void ApplySoftClip_OutputStaysWithinPlusMinusOne()
     {
-        // Master soft clipper prevents 32-voice clipping.
         var ec = new EffectsChain(44100);
         var buf = new float[1024];
-        for (int i = 0; i < buf.Length; i++) buf[i] = 10.0f; // way above 1.0
+        for (int i = 0; i < buf.Length; i++) buf[i] = 10.0f;
         ec.ApplySoftClip(buf.AsSpan());
         foreach (float s in buf)
-            Assert.That(s, Is.InRange(-1.0f - 1e-4f, 1.0f + 1e-4f),
-                "SoftClip must bring all samples within [-1, 1].");
+            Assert.That(s, Is.InRange(-1.0f - 1e-4f, 1.0f + 1e-4f));
     }
 
-    [Test] public void RetroFilter_PS1Mode_SampleHold_MaintainsBufferLength()
+    [Test] public void RetroFilter_PS1Mode_SampleHold_MaintainsBufferLength_Mono()
     {
-        // PS1 mode downsamples 44100→11025 (factor 4).
-        // Must use Sample & Hold — NOT buffer shrinking.
-        // Every group of 4 samples must have identical values (held sample).
         var ec = new EffectsChain(44100);
         ec.Retro.Mode    = Sinto.Core.Synth.RetroMode.PS1;
         ec.Retro.Enabled = true;
-
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.1f);
         ec.Process(buf.AsSpan(), 1);
-
-        // After PS1 processing, every 4 consecutive mono samples must be identical
         for (int i = 0; i < buf.Length - 3; i += 4) {
-            Assert.That(buf[i+1], Is.EqualTo(buf[i]).Within(1e-6f),
-                $"PS1 Sample&Hold: buf[{i+1}] != buf[{i}]. Buffer may have been shrunk.");
-            Assert.That(buf[i+2], Is.EqualTo(buf[i]).Within(1e-6f),
-                $"PS1 Sample&Hold: buf[{i+2}] != buf[{i}].");
-            Assert.That(buf[i+3], Is.EqualTo(buf[i]).Within(1e-6f),
-                $"PS1 Sample&Hold: buf[{i+3}] != buf[{i}].");
+            Assert.That(buf[i+1], Is.EqualTo(buf[i]).Within(1e-6f), $"PS1 S&H mono: [{i+1}]!=[{i}]");
+            Assert.That(buf[i+2], Is.EqualTo(buf[i]).Within(1e-6f), $"PS1 S&H mono: [{i+2}]!=[{i}]");
+            Assert.That(buf[i+3], Is.EqualTo(buf[i]).Within(1e-6f), $"PS1 S&H mono: [{i+3}]!=[{i}]");
+        }
+    }
+
+    [Test] public void RetroFilter_PS1Mode_SampleHold_Stereo_LRIndependent()
+    {
+        // STEREO: L and R must each be independently held every 4 frames.
+        // buf: [L0,R0, L1,R1, L2,R2, ...] interleaved stereo
+        const int Channels = 2;
+        const int Frames   = 1024;
+        var ec = new EffectsChain(44100);
+        ec.Retro.Mode    = Sinto.Core.Synth.RetroMode.PS1;
+        ec.Retro.Enabled = true;
+        var buf = new float[Frames * Channels];
+        for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.07f) * 0.5f;
+        ec.Process(buf.AsSpan(), Channels);
+        for (int f = 0; f < Frames - 4; f += 4) {
+            float L0 = buf[f * Channels];
+            float R0 = buf[f * Channels + 1];
+            for (int k = 1; k < 4; k++) {
+                Assert.That(buf[(f+k)*Channels],   Is.EqualTo(L0).Within(1e-6f),
+                    $"PS1 S&H stereo: L at frame {f+k} != L at frame {f}.");
+                Assert.That(buf[(f+k)*Channels+1], Is.EqualTo(R0).Within(1e-6f),
+                    $"PS1 S&H stereo: R at frame {f+k} != R at frame {f}.");
+            }
         }
     }
 }

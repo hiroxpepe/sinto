@@ -131,6 +131,38 @@ public class VoiceManagerTests
             "With sustain pedal down, NoteOff must not release the voice.");
     }
 
+    [Test] public void SustainPedal_Released_DoesNotKillPhysicallyHeldNotes()
+    {
+        // Scenario: hold C4, press pedal, play C5, release pedal.
+        // C4 (still physically held) must NOT be released.
+        // C5 (NoteOff received while pedal was down) MUST be released.
+        var vm = new VoiceManager(32, 44100);
+        var env = new EnvelopeParams(0.001f, 0.1f, 1.0f, 2.0f);
+
+        // NoteOn C4 (midi=60) — key is held
+        vm.NoteOn(new Note(60, 0.8f, 2, 5), DefaultOsc(), DefaultOsc(),
+            env, EnvelopeParams.Default, EnvelopeParams.Default);
+
+        vm.SetSustainPedal(true);
+
+        // NoteOn C5 (midi=72), then NoteOff — key released while pedal down
+        vm.NoteOn(new Note(72, 0.8f, 2, 5), DefaultOsc(), DefaultOsc(),
+            env, EnvelopeParams.Default, EnvelopeParams.Default);
+        vm.NoteOff(72, 2); // deferred — pedal is down
+
+        // Release pedal
+        vm.SetSustainPedal(false);
+
+        // C5 (IsKeyHeld=false) must be in Release
+        Assert.That(vm.IsNoteActive(72, 2), Is.False,
+            "C5 (key released before pedal up) must transition to Release when pedal released.");
+
+        // C4 (IsKeyHeld=true — still physically pressed) must stay active
+        Assert.That(vm.IsNoteActive(60, 2), Is.True,
+            "C4 (still physically held) must NOT be released when pedal is lifted. " +
+            "IsKeyHeld flag missing from Voice struct.");
+    }
+
     [Test] public void SustainPedal_Released_FiresDeferredNoteOffs()
     {
         var vm = new VoiceManager(32, 44100);

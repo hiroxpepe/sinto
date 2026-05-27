@@ -103,6 +103,27 @@ public class VoiceScalerTests
             "Cooldown must prevent double tier-down (hunting).");
     }
 
+    [Test] public void SingleFrameSpike_DoesNotTriggerTierDown()
+    {
+        // Mobile GC / OS scheduler causes single-frame audio callback delays.
+        // 1 overloaded frame must NOT trigger TierDown — only N consecutive frames.
+        var fake = new FakeTimeProvider();
+        var vm = new VoiceManager(32, SampleRate);
+        var vs = new VoiceScaler(vm, fake);
+
+        double overloadMs = (BufLen / (double)SampleRate) * 1000.0 * 0.75;
+        double normalMs   = (BufLen / (double)SampleRate) * 1000.0 * 0.3;
+
+        // ONE overloaded frame followed by normal frames
+        vs.OnCallbackBegin(); fake.AdvanceMs(overloadMs); vs.OnCallbackEnd(BufLen, SampleRate);
+        vs.OnCallbackBegin(); fake.AdvanceMs(normalMs);   vs.OnCallbackEnd(BufLen, SampleRate);
+        vs.OnCallbackBegin(); fake.AdvanceMs(normalMs);   vs.OnCallbackEnd(BufLen, SampleRate);
+
+        Assert.That(vs.CurrentTierIndex, Is.EqualTo(0),
+            "Single-frame overload spike must NOT trigger TierDown. " +
+            "Only N consecutive overloads should cause tier change.");
+    }
+
     [Test] public void Cooldown_ExpiresAfter64Callbacks_AllowsNextTierChange()
     {
         // If _cooldownRemaining is never decremented, tier changes lock forever.

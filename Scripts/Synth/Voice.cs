@@ -20,7 +20,14 @@ public struct Voice {
     public SmoothedParameter SmoothedResonance;
     public SmoothedParameter SmoothedAmpLevel;
     public SmoothedParameter SmoothedPitchMod;
+    public PortamentoState Portamento;
     public int            QuickReleaseSamplesRemaining;
+    // IsKeyHeld: true = physical key is still pressed.
+    // Required for correct Sustain Pedal behavior:
+    //   NoteOff while pedal down → IsKeyHeld = false, voice stays sustained.
+    //   Pedal release → only voices with IsKeyHeld=false transition to Release.
+    //   Without this flag, releasing pedal kills notes that are still physically held.
+    public bool IsKeyHeld;
     // Preset parameters are shared across all voices via SintoEngine._activePreset.
     // DO NOT embed LFOParams/OscillatorParams/EnvelopeParams per-voice.
     // 32 voices × (LFOParams + OscillatorParams×2 + EnvelopeParams×3) wastes L1 cache.
