@@ -2,7 +2,6 @@
 using System;
 using NUnit.Framework;
 using Sinto.Core.Synth;
-using Sinto.Core.Synth;
 
 namespace Sinto.Tests.Synth;
 

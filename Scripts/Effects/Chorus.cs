@@ -2,14 +2,20 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
+using Sinto.Core.Synth;
 
 namespace Sinto.Core.Effects;
 
-public sealed class Chorus : MonoEffect
-{
-    // Instance buffers (NOT static — data race between BGM and SFX engines)
-    private readonly float[] _delayBufL;
-    private readonly float[] _delayBufR;
+/// <summary>BBD-style chorus with modulated delay lines.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
+public sealed class Chorus : MonoEffect {
+#nullable enable
+    private readonly float[] _delay_l;
+    private readonly float[] _delay_r;
+    private int   _write_pos;
+    private double _lfo_phase;
+    private readonly int _sample_rate;
+    private readonly int _max_delay_samples;
 
     public int   Mode  { get; set; } = 1;
     public float Rate  { get; set; } = 0.5f;
@@ -17,11 +23,62 @@ public sealed class Chorus : MonoEffect
     public float Mix   { get; set; } = 0.5f;
 
     public Chorus(int sampleRate = 44100) {
-        _delayBufL = new float[sampleRate]; // instance — not static
-        _delayBufR = new float[sampleRate];
+        if (sampleRate <= 0) sampleRate = 44100;
+        _sample_rate = sampleRate;
+        _max_delay_samples = sampleRate / 20; // 50ms max
+        _delay_l = new float[_max_delay_samples];
+        _delay_r = new float[_max_delay_samples];
+        _write_pos = 0;
+        _lfo_phase = 0.0;
     }
-    public override void Process(Span<float> buffer, int channels)
-        => throw new NotImplementedException();
-    public override void Reset()
-        => throw new NotImplementedException();
+
+    public override void Process(Span<float> buffer, int channels) {
+        if (!Enabled || Mix <= 0f) return;
+        if (channels < 1) channels = 1;
+        int frames = buffer.Length / channels;
+        double lfo_inc = 2.0 * Math.PI * Rate / _sample_rate;
+        // Base delay = 15ms
+        float base_delay = _sample_rate * 0.015f;
+        float depth_samples = base_delay * Depth;
+        for (int f = 0; f < frames; f++) {
+            float lfo_val = (float)Math.Sin(_lfo_phase);
+            _lfo_phase += lfo_inc;
+            if (_lfo_phase >= 2.0 * Math.PI) _lfo_phase -= 2.0 * Math.PI;
+            float delay_l_samples = base_delay + lfo_val * depth_samples;
+            float delay_r_samples = base_delay + (float)Math.Cos(_lfo_phase) * depth_samples;
+            // Read with fractional delay (linear interpolation)
+            float read_l = ReadDelay(_delay_l, delay_l_samples);
+            float read_r = ReadDelay(_delay_r, delay_r_samples);
+            // Get input
+            int i = f * channels;
+            float dry_l = buffer[i];
+            float dry_r = channels >= 2 ? buffer[i + 1] : dry_l;
+            // Write dry to delay
+            _delay_l[_write_pos] = dry_l;
+            _delay_r[_write_pos] = dry_r;
+            _write_pos = (_write_pos + 1) % _max_delay_samples;
+            // Mix
+            buffer[i] = dry_l * (1f - Mix) + read_l * Mix;
+            if (channels >= 2)
+                buffer[i + 1] = dry_r * (1f - Mix) + read_r * Mix;
+        }
+        ApplyMonoCompatibility(buffer, channels);
+    }
+
+    private float ReadDelay(float[] buf, float samples) {
+        if (samples < 1f) samples = 1f;
+        if (samples > _max_delay_samples - 1) samples = _max_delay_samples - 1;
+        int idx = (int)samples;
+        float frac = samples - idx;
+        int read_pos = (_write_pos - idx + _max_delay_samples) % _max_delay_samples;
+        int read_pos2 = (read_pos - 1 + _max_delay_samples) % _max_delay_samples;
+        return buf[read_pos] * (1f - frac) + buf[read_pos2] * frac;
+    }
+
+    public override void Reset() {
+        Array.Clear(_delay_l, 0, _delay_l.Length);
+        Array.Clear(_delay_r, 0, _delay_r.Length);
+        _write_pos = 0;
+        _lfo_phase = 0.0;
+    }
 }

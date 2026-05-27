@@ -5,44 +5,84 @@ using System.Runtime.CompilerServices;
 
 namespace Sinto.Core.Synth;
 
+/// <summary>Dynamic voice scaler. Tier-based reduction under load.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Scaler {
-    private static readonly int[] Tiers = { 32, 24, 16 };
-    private const float DownThreshold         = 0.70f;
-    private const int   ConsecutiveOverloadRequired = 3; // Must exceed threshold N times in a row
-    // Single-frame spikes (GC, OS scheduler, touch event) must NOT trigger TierDown.
-    // Mobile: even a simple screen touch can cause a 1-frame audio callback delay.
-    // Solution: only TierDown after N consecutive overloads (default 3 = ~35ms at 512/44100).
-    private const float UpThreshold      = 0.40f;
-    private const int   CooldownCallbacks = 64;
-    private const int   HeadroomCallbacks = 300;
+#nullable enable
+    private static readonly int[] TIERS = { 32, 24, 16 };
+    private const float DOWN_THRESHOLD                 = 0.70f;
+    private const int   CONSECUTIVE_OVERLOAD_REQUIRED  = 3;
+    private const float UP_THRESHOLD                   = 0.40f;
+    private const int   COOLDOWN_CALLBACKS             = 64;
+    private const int   HEADROOM_CALLBACKS             = 300;
 
-    private readonly Voices  _voiceManager;
-    private readonly ITimer _time;   // injected for testability
-    private int  _currentTierIndex;
-    private int  _cooldownRemaining;
-    private int  _consecutiveOverload;  // consecutive frames above DownThreshold
-    private int  _consecutiveHeadroom;
-    private long _callbackStartTick;
+    private readonly Voices _voices;
+    private readonly ITimer _time;
+    private int  _current_tier_index;
+    private int  _cooldown_remaining;
+    private int  _consecutive_overload;
+    private int  _consecutive_headroom;
+    private long _callback_start_tick;
 
-    public int CurrentMaxVoices => throw new System.NotImplementedException();
-    public int CurrentTierIndex => _currentTierIndex;
+    public int CurrentMaxVoices => TIERS[_current_tier_index];
+    public int CurrentTierIndex => _current_tier_index;
 
-    /// <param name="voiceManager">The voice manager to scale.</param>
-    /// <param name="timeProvider">Time source — use null for production (SystemTimer).</param>
-    public Scaler(Voices voiceManager, ITimer? timeProvider = null)
-        => throw new System.NotImplementedException();
+    public Scaler(Voices voices, ITimer? timeProvider = null) {
+        _voices = voices ?? throw new System.ArgumentNullException(nameof(voices));
+        _time   = timeProvider ?? SystemTimer.Instance;
+        _current_tier_index  = 0;
+        _cooldown_remaining  = 0;
+        _consecutive_overload = 0;
+        _consecutive_headroom = 0;
+        _callback_start_tick = 0L;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void OnCallbackBegin()
-        => throw new System.NotImplementedException();
+    public void OnCallbackBegin() {
+        _callback_start_tick = _time.GetTimestamp();
+    }
 
-    // OnCallbackEnd implementation MUST decrement cooldown first:
-    //   if (_cooldownRemaining > 0) { _cooldownRemaining--; return; }
-    // Without this decrement, cooldown never expires → dynamic scaling fires once then dies.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void OnCallbackEnd(int bufferLength, int sampleRate = 44100)
-        => throw new System.NotImplementedException();
+    public void OnCallbackEnd(int bufferLength, int sampleRate = 44100) {
+        // Decrement cooldown first
+        if (_cooldown_remaining > 0) {
+            _cooldown_remaining--;
+            return;
+        }
+        long elapsed_ticks = _time.GetTimestamp() - _callback_start_tick;
+        double elapsed_sec = (double)elapsed_ticks / _time.Frequency;
+        double buffer_duration = (double)bufferLength / sampleRate;
+        double usage = elapsed_sec / buffer_duration;
+        if (usage >= DOWN_THRESHOLD) {
+            _consecutive_overload++;
+            _consecutive_headroom = 0;
+            if (_consecutive_overload >= CONSECUTIVE_OVERLOAD_REQUIRED &&
+                _current_tier_index < TIERS.Length - 1) {
+                _current_tier_index++;
+                _voices.SetMaxVoices(TIERS[_current_tier_index]);
+                _cooldown_remaining = COOLDOWN_CALLBACKS;
+                _consecutive_overload = 0;
+            }
+        } else if (usage <= UP_THRESHOLD) {
+            _consecutive_overload = 0;
+            _consecutive_headroom++;
+            if (_consecutive_headroom >= HEADROOM_CALLBACKS &&
+                _current_tier_index > 0) {
+                _current_tier_index--;
+                _voices.SetMaxVoices(TIERS[_current_tier_index]);
+                _cooldown_remaining  = COOLDOWN_CALLBACKS;
+                _consecutive_headroom = 0;
+            }
+        } else {
+            _consecutive_overload = 0;
+            _consecutive_headroom = 0;
+        }
+    }
 
-    public void ForceSetTier(int tierIndex)
-        => throw new System.NotImplementedException();
+    public void ForceSetTier(int tierIndex) {
+        if (tierIndex < 0) tierIndex = 0;
+        if (tierIndex >= TIERS.Length) tierIndex = TIERS.Length - 1;
+        _current_tier_index = tierIndex;
+        _voices.SetMaxVoices(TIERS[tierIndex]);
+    }
 }

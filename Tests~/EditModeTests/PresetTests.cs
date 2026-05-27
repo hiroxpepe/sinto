@@ -7,7 +7,6 @@ using NUnit.Framework;
 using Sinto.Core.Preset;
 using Preset = Sinto.Core.Preset.Preset;
 using Sinto.Core.Synth;
-using Sinto.Core.Synth;
 
 namespace Sinto.Tests.Preset;
 

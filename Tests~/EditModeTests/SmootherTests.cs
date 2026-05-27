@@ -101,9 +101,15 @@ public class SmootherTests
 
     [Test] public void Tick_AfterConvergence_DoesNotTriggerGC()
     {
-        // Verify no allocation in steady-state (converged) tick loop
+        // Verify no allocation in steady-state (converged) tick loop.
+        // Force a clean GC state first so we measure only what THIS loop allocates.
         var sp = new Smoother(1.0f, smoothingHz: 20f, sampleRate: 44100);
         sp.SnapToTarget();
+        // Warm up: ensure any JIT/init allocations happen BEFORE the measurement window
+        for (int i = 0; i < 100; i++) sp.Tick();
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        System.GC.Collect();
         int gen0Before = System.GC.CollectionCount(0);
         for (int i = 0; i < 44100; i++) sp.Tick();
         Assert.That(System.GC.CollectionCount(0), Is.EqualTo(gen0Before));

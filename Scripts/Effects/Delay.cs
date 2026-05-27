@@ -5,51 +5,101 @@ using System;
 
 namespace Sinto.Core.Effects;
 
-public sealed class Delay : IEffect
-{
-    // FRACTIONAL DELAY DESIGN:
-    // When delay time changes (e.g. 500ms → 250ms), the read pointer must NOT
-    // jump instantly. Abrupt pointer warp causes waveform discontinuity → "pop" click noise.
-    //
-    // Correct implementation:
-    //   _targetReadPos = currentWritePos - (newDelayTime * sampleRate)
-    //   per sample: _readPos += (_targetReadPos - _readPos) * smoothCoeff
-    //   (smoothCoeff ≈ 1e-3 gives ~2ms crossfade — imperceptible)
-    //
-    // Also: Feedback clamped to 0.95 maximum to prevent infinite feedback runaway.
+/// <summary>Stereo delay with fractional read pointer (smooth time changes).</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
+public sealed class Delay : IEffect {
+#nullable enable
+    private readonly float[] _delay_buf_l;
+    private readonly float[] _delay_buf_r;
+    private int   _write_pos;
+    private float _read_pos_l;
+    private float _read_pos_r;
+    private float _target_time_sec;
+    private readonly int _sample_rate;
+    private readonly int _max_samples;
 
-    // Instance buffer (NOT static — multiple Delay instances must not share buffers)
-    private readonly float[] _delayBufL;
-    private readonly float[] _delayBufR;
-    private int   _writePos;
-    private float _readPosL;      // fractional read position L
-    private float _readPosR;      // fractional read position R
-    private float _targetTimeSec; // smooth target for dynamic time change
-
-    public float Time      { get; set; }  // [0.001, 2.0] seconds
-    public float Feedback  { get; set; }  // [0.0, 0.95] — hard capped
-    public float Mix       { get; set; }  // [0.0, 1.0]
+    public float Time      { get; set; } = 0.25f;
+    public float Feedback  { get; set; } = 0.3f;
+    public float Mix       { get; set; } = 0.3f;
     public bool  TempoSync { get; set; }
-    public float Bpm       { get; set; }
-    public float SyncNote  { get; set; }
+    public float Bpm       { get; set; } = 120f;
+    public float SyncNote  { get; set; } = 0.25f;
     public bool  Enabled   { get; set; }
 
     public Delay(int sampleRate = 44100) {
-        // 2 seconds max delay at 44100Hz per channel
-        _delayBufL = new float[sampleRate * 2];
-        _delayBufR = new float[sampleRate * 2];
+        if (sampleRate <= 0) sampleRate = 44100;
+        _sample_rate = sampleRate;
+        _max_samples = sampleRate * 2; // 2 second max
+        _delay_buf_l = new float[_max_samples];
+        _delay_buf_r = new float[_max_samples];
+        _write_pos = 0;
+        _read_pos_l = 0f;
+        _read_pos_r = 0f;
+        _target_time_sec = Time;
     }
 
-    public void Process(Span<float> buffer, int channels)
-        => throw new NotImplementedException();
+    public void Process(Span<float> buffer, int channels) {
+        if (!Enabled || Mix <= 0f) return;
+        if (channels < 1) channels = 1;
+        // Clamp feedback to prevent runaway
+        float fb = Feedback;
+        if      (fb < 0f)    fb = 0f;
+        else if (fb > 0.95f) fb = 0.95f;
+        // Target sample delay (fractional)
+        float target_samples = Time * _sample_rate;
+        if (target_samples < 1f)              target_samples = 1f;
+        if (target_samples > _max_samples - 4) target_samples = _max_samples - 4;
+        // Smooth read pointer towards target (fractional delay — prevents click)
+        const float SMOOTH = 0.001f;
+        float target_read_l = (_write_pos - target_samples + _max_samples) % _max_samples;
+        float target_read_r = target_read_l;
+        int frames = buffer.Length / channels;
+        for (int f = 0; f < frames; f++) {
+            // Move read pointers towards target
+            float diff_l = target_read_l - _read_pos_l;
+            if (diff_l >  _max_samples * 0.5f) diff_l -= _max_samples;
+            if (diff_l < -_max_samples * 0.5f) diff_l += _max_samples;
+            _read_pos_l += diff_l * SMOOTH + 1f;
+            if (_read_pos_l < 0)            _read_pos_l += _max_samples;
+            if (_read_pos_l >= _max_samples) _read_pos_l -= _max_samples;
+            _read_pos_r += diff_l * SMOOTH + 1f;
+            if (_read_pos_r < 0)            _read_pos_r += _max_samples;
+            if (_read_pos_r >= _max_samples) _read_pos_r -= _max_samples;
+            // Linear interpolation read
+            int idx_l = (int)_read_pos_l;
+            float frac_l = _read_pos_l - idx_l;
+            int idx_l2 = (idx_l + 1) % _max_samples;
+            float delayed_l = _delay_buf_l[idx_l] * (1f - frac_l) + _delay_buf_l[idx_l2] * frac_l;
+            int idx_r = (int)_read_pos_r;
+            float frac_r = _read_pos_r - idx_r;
+            int idx_r2 = (idx_r + 1) % _max_samples;
+            float delayed_r = _delay_buf_r[idx_r] * (1f - frac_r) + _delay_buf_r[idx_r2] * frac_r;
+            int i = f * channels;
+            float in_l = buffer[i];
+            float in_r = channels >= 2 ? buffer[i + 1] : in_l;
+            // Write to delay (input + feedback)
+            _delay_buf_l[_write_pos] = in_l + delayed_l * fb;
+            _delay_buf_r[_write_pos] = in_r + delayed_r * fb;
+            _write_pos = (_write_pos + 1) % _max_samples;
+            // Mix
+            buffer[i] = in_l * (1f - Mix) + delayed_l * Mix;
+            if (channels >= 2)
+                buffer[i + 1] = in_r * (1f - Mix) + delayed_r * Mix;
+        }
+    }
 
-    public void Reset()
-        => throw new NotImplementedException();
+    public void Reset() {
+        Array.Clear(_delay_buf_l, 0, _delay_buf_l.Length);
+        Array.Clear(_delay_buf_r, 0, _delay_buf_r.Length);
+        _write_pos = 0;
+        _read_pos_l = 0f;
+        _read_pos_r = 0f;
+    }
 
-    /// <summary>
-    /// Update BPM for tempo sync. Recalculates target delay time.
-    /// Does NOT jump the read pointer — uses fractional crossfade.
-    /// </summary>
-    public void SetBPM(float bpm)
-        => throw new NotImplementedException();
+    public void SetBPM(float bpm) {
+        Bpm = bpm;
+        if (TempoSync) {
+            Time = 60f / bpm * SyncNote * 4f;
+        }
+    }
 }

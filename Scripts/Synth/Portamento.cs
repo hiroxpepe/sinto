@@ -1,29 +1,47 @@
 // Copyright (c) STUDIO MeowToon. All rights reserved.
 // Licensed under the MIT License.
 #nullable enable
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Sinto.Core.Synth;
 
-public struct Portamento
-{
-    private float _currentFreq;
-    private float _targetFreq;
-    private float _rate; // frequency change per sample
+/// <summary>Portamento glide state. Linear frequency interpolation.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
+public struct Portamento {
+#nullable enable
+    private float _current_freq;
+    private float _target_freq;
+    private float _rate;
 
-    public float CurrentFrequency { get; }
-    public bool  IsGliding        { get; }
+    public float CurrentFrequency => _current_freq;
+    public bool  IsGliding => _current_freq != _target_freq;
 
-    /// <summary>Set glide target. time=0 → SnapToTarget.</summary>
-    public void SetTarget(float targetFreqHz, float timeSeconds, int sampleRate)
-        => throw new System.NotImplementedException();
+    public void SetTarget(float targetFreqHz, float timeSeconds, int sampleRate) {
+        if (sampleRate <= 0) sampleRate = 44100;
+        if (targetFreqHz < 0.001f) targetFreqHz = 0.001f;
+        _target_freq = targetFreqHz;
+        if (timeSeconds <= 0f) {
+            _current_freq = targetFreqHz;
+            _rate = 0f;
+        } else {
+            float diff = targetFreqHz - _current_freq;
+            _rate = diff / (timeSeconds * sampleRate);
+        }
+    }
 
-    /// <summary>Instant jump — no glide. Call on NoteOn when portamento=0.</summary>
-    public void SnapToTarget()
-        => throw new System.NotImplementedException();
+    public void SnapToTarget() => _current_freq = _target_freq;
 
-    /// <summary>Advance one sample. Returns current frequency.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public float Tick()
-        => throw new System.NotImplementedException();
+    public float Tick() {
+        if (_current_freq == _target_freq) return _current_freq;
+        _current_freq += _rate;
+        // Check if reached target (handle both directions)
+        if ((_rate > 0f && _current_freq >= _target_freq) ||
+            (_rate < 0f && _current_freq <= _target_freq)) {
+            _current_freq = _target_freq;
+        }
+        if (_current_freq < 0.001f) _current_freq = 0.001f;
+        return _current_freq;
+    }
 }

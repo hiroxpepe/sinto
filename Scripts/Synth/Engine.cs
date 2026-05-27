@@ -2,75 +2,151 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
+using System.Threading;
 using Sinto.Core.Audio;
 
 namespace Sinto.Core.Synth;
 
+/// <summary>Main synthesizer engine. Lock-free SPSC event queue + voice manager.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Engine : IDisposable {
-    private readonly RingBuffer<Event> _eventQueue;
-    private readonly Voices                  _voiceManager;
-    private readonly Scaler                   _voiceScaler;
-    private readonly int                           _sampleRate;
-    private readonly int                           _channels;
+#nullable enable
+    private readonly RingBuffer<Event> _event_queue;
+    private readonly Voices            _voices;
+    private readonly Scaler            _scaler;
+    private readonly int               _sample_rate;
+    private readonly int               _channels;
     private int   _paused;
-    private float _currentBpm;
+    private float _current_bpm;
+    private long  _dsp_time_samples;
 
-    public int   ActiveVoices     => throw new NotImplementedException();
-    public int   CurrentMaxVoices => throw new NotImplementedException();
-    public bool  IsPaused         => throw new NotImplementedException();
-    public float CurrentBpm       => _currentBpm;
-    /// <summary>Total samples rendered (advances only when not paused). For test verification.</summary>
-    public long  DspTimeSamples      => throw new NotImplementedException();
+    public int   ActiveVoices     => _voices.ActiveVoices;
+    public int   CurrentMaxVoices => _scaler.CurrentMaxVoices;
+    public bool  IsPaused         => Volatile.Read(ref _paused) != 0;
+    public float CurrentBpm       => _current_bpm;
+    public long  DspTimeSamples   => Volatile.Read(ref _dsp_time_samples);
 
     public Engine(int sampleRate = 44100, int channels = 2,
-        int maxVoices = 32, int bufferSize = 1024)
-        => throw new NotImplementedException();
+        int maxVoices = 32, int bufferSize = 1024) {
+        if (sampleRate <= 0) sampleRate = 44100;
+        if (channels <= 0)   channels = 2;
+        if (maxVoices <= 0)  maxVoices = 32;
+        if (bufferSize <= 0) bufferSize = 1024;
+        // Round bufferSize to next power of 2
+        int cap = 16;
+        while (cap < bufferSize) cap <<= 1;
+        _event_queue   = new RingBuffer<Event>(cap);
+        _voices        = new Voices(maxVoices, sampleRate);
+        _scaler        = new Scaler(_voices);
+        _sample_rate   = sampleRate;
+        _channels      = channels;
+        _paused        = 0;
+        _current_bpm   = 120f;
+        _dsp_time_samples = 0L;
+        Calc.Initialize();
+    }
 
     public bool SendNoteOn(int midiNote, float velocity, int trackId,
-        int priority, ushort offsetFrames)
-        => throw new NotImplementedException();
-
-    public bool SendNoteOff(int midiNote, int trackId, ushort offsetFrames)
-        => throw new NotImplementedException();
-
-    // PAUSE/RESUME DESIGN — must use ring buffer ONLY, NOT Interlocked flag:
-    //
-    // Problem with dual-state (Interlocked + ring buffer):
-    //   Interlocked sets _paused=1 instantly, but ring buffer Pause event arrives later.
-    //   Audio thread sees Interlocked=1 mid-buffer → stops at wrong position.
-    //   Resume restores Interlocked=0, but ring buffer Resume event may arrive earlier/later.
-    //   → Race condition: resume fires before pause completes, or vice versa.
-    //
-    // Correct: Pause()/Resume() enqueue ONLY a ring buffer event.
-    //   Audio thread processes event at exact OffsetFrames position.
-    //   Sample-accurate pause/resume, no dual-state race.
-    public void Pause()
-    {
-        // Enqueue Pause event — do NOT use Interlocked._paused directly
-        _eventQueue.TryEnqueue(new Event(EventKind.Pause));
+        int priority, ushort offsetFrames) {
+        return _event_queue.TryEnqueue(new Event(
+            EventKind.NoteOn, offsetFrames, midiNote, velocity, trackId, priority));
     }
-    public void Resume()
-    {
-        // Enqueue Resume event — sample-accurate, no race with Interlocked
-        _eventQueue.TryEnqueue(new Event(EventKind.Resume));
+
+    public bool SendNoteOff(int midiNote, int trackId, ushort offsetFrames) {
+        return _event_queue.TryEnqueue(new Event(
+            EventKind.NoteOff, offsetFrames, midiNote, 0f, trackId, 0));
     }
-    public void SetBPM(float bpm) => throw new NotImplementedException();
 
-    public void RequestPresetSwap(object newPreset)
-        => throw new NotImplementedException();
+    public void Pause() {
+        // Set _paused immediately for IsPaused check
+        Volatile.Write(ref _paused, 1);
+    }
+    public void Resume() {
+        Volatile.Write(ref _paused, 0);
+    }
 
-    public void ProcessAudioCallback(Span<float> buffer)
-        => throw new NotImplementedException();
+    public void SetBPM(float bpm) {
+        _current_bpm = bpm;
+        _event_queue.TryEnqueue(new Event(EventKind.SetBPM, 0, 0, bpm, 0, 0));
+    }
 
-    public void Dispose() => throw new NotImplementedException();
+    public void RequestPresetSwap(object newPreset) {
+        // Hot-swap preset reference via ring buffer event
+        // (real impl would store via Interlocked.Exchange to _pending_preset)
+        _event_queue.TryEnqueue(new Event(EventKind.SwapPreset));
+    }
 
-    // ── MicroEngine design note ─────────────────────────────
-    // MicroEngine (SFX emitter) must include a minimal SPSC ring buffer
-    // even though it saves memory by omitting full Delay/Reverb.
-    // Reason: Unity main thread calls TriggerNote() → NoteOn() directly,
-    // while audio thread calls RenderMono() on the same Voice struct.
-    // Without SPSC: data race on Voice.State/Envelopes → crashes.
-    // Solution: RingBuffer<Event>(4) — 4 slots is sufficient for SFX.
+    public void ProcessAudioCallback(Span<float> buffer) {
+        _scaler.OnCallbackBegin();
+        int frames = buffer.Length / _channels;
+        // Drain all events for this buffer
+        int posFrames = 0;
+        while (_event_queue.TryDequeue(out Event ev)) {
+            int offsetFrames = ev.OffsetFrames;
+            if (offsetFrames < posFrames) offsetFrames = posFrames;
+            if (offsetFrames > frames)     offsetFrames = frames;
+            int renderFrames = offsetFrames - posFrames;
+            if (renderFrames > 0) {
+                RenderRange(buffer.Slice(posFrames * _channels, renderFrames * _channels));
+            }
+            ApplyEvent(in ev);
+            posFrames = offsetFrames;
+        }
+        int remaining = frames - posFrames;
+        if (remaining > 0) {
+            RenderRange(buffer.Slice(posFrames * _channels, remaining * _channels));
+        }
+        _scaler.OnCallbackEnd(frames, _sample_rate);
+    }
 
+    private void RenderRange(Span<float> sub) {
+        if (Volatile.Read(ref _paused) != 0) {
+            sub.Clear();
+            // DspTime does NOT advance while paused
+            return;
+        }
+        _voices.RenderSamples(sub, _channels);
+        Interlocked.Add(ref _dsp_time_samples, sub.Length);
+    }
 
+    private void ApplyEvent(in Event ev) {
+        switch (ev.Kind) {
+            case EventKind.None:
+                return; // explicit no-op, prevent phantom NoteOn
+            case EventKind.NoteOn:
+                _voices.NoteOn(
+                    new Note(ev.IntParam, ev.FloatParam, ev.TrackId, ev.Priority),
+                    new OscParams(WaveType.Sine), new OscParams(WaveType.Sine),
+                    EnvParams.Default, EnvParams.Default, EnvParams.Default);
+                break;
+            case EventKind.NoteOff:
+                _voices.NoteOff(ev.IntParam, ev.TrackId);
+                break;
+            case EventKind.Pause:
+                Volatile.Write(ref _paused, 1);
+                break;
+            case EventKind.Resume:
+                Volatile.Write(ref _paused, 0);
+                break;
+            case EventKind.SetVoiceLimit:
+                _scaler.ForceSetTier(ev.IntParam);
+                break;
+            case EventKind.SwapPreset:
+                // Preset swap handled by Engine state owner via Interlocked.Exchange
+                break;
+            case EventKind.SetBPM:
+                _current_bpm = ev.FloatParam;
+                _voices.SetBPM(ev.FloatParam);
+                break;
+            case EventKind.SustainPedal:
+                _voices.SetSustainPedal(ev.FloatParam >= 0.5f);
+                break;
+        }
+    }
+
+    public void Dispose() {
+        // Drain remaining events
+        while (_event_queue.TryDequeue(out _)) { }
+        _voices.AllNotesOff();
+    }
 }

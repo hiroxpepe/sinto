@@ -199,7 +199,7 @@ public class RingBufferTests
     // ── SPSC Concurrency ─────────────────────────────────────────
 
     [Test]
-    [Timeout(5000)] // 5s timeout — prevents CI freeze if TryEnqueue/Dequeue deadlocks
+    [CancelAfter(5000)] // 5s timeout — prevents CI freeze if TryEnqueue/Dequeue deadlocks
     public void SPSC_100k_Operations_ZeroLoss()
     {
         const int COUNT = 100_000;
