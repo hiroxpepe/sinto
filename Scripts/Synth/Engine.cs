@@ -70,7 +70,7 @@ public sealed class Engine : IDisposable {
         _osc1_level   = osc1Level;
         _osc2_level   = osc2Level;
         _detune_cents = detuneCents;
-        // 鳴っている voice に即時反映
+        // Apply immediately to currently playing voices
         _voices.SetOscLevels(osc1Level, osc2Level, detuneCents);
     }
 

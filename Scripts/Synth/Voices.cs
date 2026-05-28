@@ -132,7 +132,7 @@ public sealed class Voices {
         _osc1_level = osc1Level < 0f ? 0f : (osc1Level > 1f ? 1f : osc1Level);
         _osc2_level = osc2Level < 0f ? 0f : (osc2Level > 1f ? 1f : osc2Level);
         _detune_cents = detuneCents;
-        // 鳴っている全ボイスに即時反映
+        // Apply immediately to all currently playing voices
         for (int i = 0; i < _max_voices; i++) {
             _voices[i].Osc1MasterLevel = _osc1_level;
             _voices[i].Osc2MasterLevel = _osc2_level;

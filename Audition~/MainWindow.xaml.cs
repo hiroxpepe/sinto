@@ -66,7 +66,7 @@ public partial class MainWindow : Window
         HighlightWave();
         HighlightFilter();
         UpdateDisplay();
-        // マウスホイールでスライダー操作
+        // Register mouse wheel events for sliders
         RegisterMouseWheel(SldCutoff,  Filter_Changed, 5);
         RegisterMouseWheel(SldReso,    Filter_Changed, 5);
         RegisterMouseWheel(SldEnvAmt,  Filter_Changed, 5);
