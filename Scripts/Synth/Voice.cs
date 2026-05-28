@@ -1,6 +1,7 @@
 // Copyright (c) STUDIO MeowToon. All rights reserved.
 // Licensed under the MIT License.
 #nullable enable
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Sinto.Core.Synth;
@@ -100,8 +101,7 @@ public struct Voice {
         if (State == PlayState.Free) return 0f;
         int sr = _sample_rate > 0 ? _sample_rate : 44100;
         // ── Smoother target update ───────────────────────────────────────
-        // Critical: set knob value into Smoother every sample
-        // Smoother IIR follows smoothly → no zipper noise
+        // SmoothedCutoff operates in [0,1] log-Hz space (Δ0.1 = 1 octave, perceptually uniform).
         SmoothedCutoff.SetTarget(filterCutoffBase);
         SmoothedResonance.SetTarget(filterResonanceBase);
         // ── Portamento ──────────────────────────────────────────────────
@@ -138,10 +138,9 @@ public struct Voice {
         float mix = (o1 + o2) * 0.5f;
         // ── Filter ──────────────────────────────────────────────────────
         float filter_env = FilterEnvelope.Tick();
-        // Tick Smoother to get current value (changes smoothly every sample)
         float cutoff    = SmoothedCutoff.Tick();
         float resonance = SmoothedResonance.Tick();
-        // Modulate cutoff via Envelope / LFO
+        // Modulate cutoff via Envelope / LFO (in [0,1] space)
         // NOTE: filter_env amount controlled by FilterEnvAmount field (0 = no modulation)
         cutoff += filter_env * FilterEnvAmount;
         if ((lfo1Params.Destinations & LfoTarget.FilterCutoff) != 0)

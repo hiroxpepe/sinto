@@ -147,8 +147,9 @@ public sealed class Engine : IDisposable {
             case EventKind.NoteOn:
                 _voices.NoteOn(
                     new Note(ev.IntParam, ev.FloatParam, ev.TrackId, ev.Priority),
-                    new OscParams(_current_wave), new OscParams(_current_wave),
-                    EnvParams.Default, EnvParams.Default, EnvParams.Default);
+                    new OscParams(_current_wave, level: _osc1_level),
+                    new OscParams(_current_wave, detuneCents: _detune_cents, level: _osc2_level),
+                    _current_amp_env, EnvParams.Default, EnvParams.Default);
                 break;
             case EventKind.NoteOff:
                 _voices.NoteOff(ev.IntParam, ev.TrackId);

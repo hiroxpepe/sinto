@@ -311,5 +311,101 @@ public class EngineTests
         }
     }
 
+    // ── SetOscParams / SetAmpEnv applied on NoteOn ────────────────────────
+    // RED: _osc1_level / _osc2_level / _detune_cents / _current_amp_env must
+    //      be baked into OscParams / EnvParams when NoteOn is applied.
+    //      Currently ApplyEvent passes new OscParams(_current_wave) with no
+    //      level or detune, and EnvParams.Default ignoring _current_amp_env.
 
+    [Test] public void SetOscParams_BothLevelsZero_NoteOnProducesSilence()
+    {
+        // OSC1+OSC2 level=0 set before NoteOn must produce near-silence.
+        using var e = new Engine();
+        e.SetOscParams(0f, 0f, 0f);
+        e.SendNoteOn(60, 0.8f, 2, 5, 0);
+        var buf = new float[2048];
+        e.ProcessAudioCallback(buf.AsSpan());
+        float rms = 0f;
+        foreach (var s in buf) rms += s * s;
+        Assert.That(rms / buf.Length, Is.LessThan(1e-4f),
+            "OSC1+OSC2 level=0 must produce near-silence after NoteOn.");
+    }
+
+    [Test] public void SetOscParams_DetuneCents_NoteOnProducesBeating()
+    {
+        // 20-cent detune set before NoteOn must produce beating vs no-detune engine.
+        using var e1 = new Engine();
+        using var e2 = new Engine();
+        e1.SetOscParams(1f, 1f,  0f);
+        e2.SetOscParams(1f, 1f, 20f);
+        e1.SendNoteOn(36, 0.8f, 2, 5, 0);
+        e2.SendNoteOn(36, 0.8f, 2, 5, 0);
+        float diff = 0f;
+        int total = 0;
+        for (int cb = 0; cb < 86; cb++) {
+            var buf1 = new float[1024];
+            var buf2 = new float[1024];
+            e1.ProcessAudioCallback(buf1.AsSpan());
+            e2.ProcessAudioCallback(buf2.AsSpan());
+            for (int i = 0; i < buf1.Length; i++) diff += MathF.Abs(buf1[i] - buf2[i]);
+            total += buf1.Length;
+        }
+        Assert.That(diff / total, Is.GreaterThan(0.001f),
+            "20-cent detune must produce different output from no-detune after NoteOn.");
+    }
+
+    [Test] public void SetAmpEnv_LongAttack_NoteOnRisesOverTime()
+    {
+        // 2-second attack set before NoteOn: early output must be quieter than late.
+        using var e = new Engine();
+        e.SetAmpEnv(2.0f, 0.1f, 1.0f, 0.1f);
+        e.SendNoteOn(60, 0.8f, 2, 5, 0);
+        var buf_early = new float[1024];
+        e.ProcessAudioCallback(buf_early.AsSpan());
+        for (int i = 0; i < 60; i++) {
+            var tmp = new float[1024]; e.ProcessAudioCallback(tmp.AsSpan());
+        }
+        var buf_late = new float[1024];
+        e.ProcessAudioCallback(buf_late.AsSpan());
+        float rms_early = 0f, rms_late = 0f;
+        foreach (var s in buf_early) rms_early += s * s;
+        foreach (var s in buf_late)  rms_late  += s * s;
+        Assert.That(rms_early, Is.LessThan(rms_late),
+            "2s attack: early output must be quieter than later output after NoteOn.");
+    }
+
+    // ── SetOscParams detune immediate effect on active voices ─────────────
+    // RED: SetOscParams must update detune on currently playing voices
+    //      immediately — not only on the next NoteOn.
+
+    [Test] public void SetOscParams_DetuneCents_ImmediateEffectOnActiveVoice()
+    {
+        // Two engines: both NoteOn with detune=0.
+        // After 1 buffer, engine2 changes detune to 30 while playing.
+        // Their outputs must diverge — proves detune takes immediate effect.
+        using var e1 = new Engine();
+        using var e2 = new Engine();
+        e1.SetOscParams(1f, 1f, 0f);
+        e2.SetOscParams(1f, 1f, 0f);
+        e1.SendNoteOn(36, 0.8f, 2, 5, 0);
+        e2.SendNoteOn(36, 0.8f, 2, 5, 0);
+        // Render 1 buffer in sync (both identical)
+        var warmup1 = new float[1024]; var warmup2 = new float[1024];
+        e1.ProcessAudioCallback(warmup1.AsSpan());
+        e2.ProcessAudioCallback(warmup2.AsSpan());
+        // Change detune on e2 only while note is active
+        e2.SetOscParams(1f, 1f, 30f);
+        // Render 6 more buffers
+        float diff = 0f; int total = 0;
+        for (int cb = 0; cb < 6; cb++) {
+            var buf1 = new float[1024]; var buf2 = new float[1024];
+            e1.ProcessAudioCallback(buf1.AsSpan());
+            e2.ProcessAudioCallback(buf2.AsSpan());
+            for (int i = 0; i < buf1.Length; i++) diff += MathF.Abs(buf1[i] - buf2[i]);
+            total += buf1.Length;
+        }
+        Assert.That(diff / total, Is.GreaterThan(0.001f),
+            "SetOscParams detune=30 on active voice must diverge from detune=0 engine. " +
+            "Voices.SetOscLevels must also propagate detune to Osc2Params.DetuneCents.");
+    }
 }

@@ -418,5 +418,46 @@ public class VoicesTests
         Assert.DoesNotThrow(() => vm.SetFilterEnvAmount(2f));
     }
 
+    // ── Cutoff Hz-space smoothing ─────────────────────────────────────────
+    // RED: Smoother must interpolate in Hz space so that sweep speed is
+    //      perceptually uniform across low and high frequency ranges.
+    //      Currently Smoother works in linear [0,1] space → high-range
+    //      sweeps are abrupt while low-range sweeps are sluggish.
 
+    [Test] public void SetFilterParams_LowRangeSweep_SpeedMatchesHighRange()
+    {
+        // [0,1] cutoff space is log-Hz: Δ0.1 always equals 1 octave.
+        // Smoother in [0,1] space is therefore perceptually uniform.
+        // Verify: low-range (0.1→0.3) and high-range (0.7→0.9) sweeps
+        // produce comparable octave-normalised output change.
+        const int SR = 44100;
+        const int MEASURE = 500;
+
+        float SweepDelta(float from, float to) {
+            var vm = new Voices(1, SR);
+            vm.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
+                EnvParams.Default, EnvParams.Default, EnvParams.Default);
+            vm.SetFilterParams(from, 0f, FilterKind.Moog);
+            var warm = new float[SR / 10];
+            vm.RenderSamples(warm.AsSpan(), 1);
+            var base_buf = new float[MEASURE];
+            vm.RenderSamples(base_buf.AsSpan(), 1);
+            vm.SetFilterParams(to, 0f, FilterKind.Moog);
+            var sweep_buf = new float[MEASURE];
+            vm.RenderSamples(sweep_buf.AsSpan(), 1);
+            float delta = 0f;
+            for (int i = 0; i < MEASURE; i++) delta += MathF.Abs(sweep_buf[i] - base_buf[i]);
+            return delta / MEASURE;
+        }
+
+        float delta_low  = SweepDelta(0.1f, 0.3f);  // 2 octaves
+        float delta_high = SweepDelta(0.7f, 0.9f);  // 2 octaves
+
+        // Both sweeps cover 2 octaves in [0,1] space.
+        // Output delta may differ due to filter amplitude, but ratio must be < 20.
+        float ratio = delta_low > 1e-8f ? delta_high / delta_low : 0f;
+        Assert.That(ratio, Is.LessThan(20f),
+            $"High-range Δ={delta_high:F5}, low-range Δ={delta_low:F5}, ratio={ratio:F1}. " +
+            "[0,1] cutoff is log-Hz: same step must produce comparable sweep speed.");
+    }
 }

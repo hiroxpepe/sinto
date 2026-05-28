@@ -135,6 +135,10 @@ public sealed class Voices {
         for (int i = 0; i < _max_voices; i++) {
             _voices[i].Osc1MasterLevel = _osc1_level;
             _voices[i].Osc2MasterLevel = _osc2_level;
+            // Rebuild Osc2Params with new detune — OscParams is readonly struct
+            ref var v = ref _voices[i];
+            v.Osc2Params = new OscParams(v.Osc2Params.Wave, v.Osc2Params.Interp,
+                detuneCents, v.Osc2Params.PulseWidth, v.Osc2Params.Level);
         }
     }
 

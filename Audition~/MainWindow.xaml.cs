@@ -29,6 +29,24 @@ public partial class MainWindow : Window
     WaveType _current_wave = WaveType.Saw;
     FilterKind _current_filter = FilterKind.Moog;
 
+    // Debug log path: sinto_debug.log in working directory
+    // DebugLog is compiled only in DEBUG builds (#if DEBUG).
+    // Release builds contain zero logging code — no runtime overhead.
+#if DEBUG
+    static readonly string LOG_PATH = System.IO.Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "sinto_debug.log");
+
+    static void DebugLog(string msg)
+    {
+        try {
+            System.IO.File.AppendAllText(LOG_PATH,
+                $"[{DateTime.Now:HH:mm:ss.fff}] {msg}{Environment.NewLine}");
+        } catch { /* never throw from logging */ }
+    }
+#else
+    static void DebugLog(string msg) { }
+#endif
+
     // PC key → semitone offset from C0 base
     static readonly Dictionary<Key, int> KEY_MAP = new() {
         // Lower row (z=C, m=B in selected octave)
@@ -67,9 +85,9 @@ public partial class MainWindow : Window
         HighlightFilter();
         UpdateDisplay();
         // Register mouse wheel events for sliders
-        RegisterMouseWheel(SldCutoff,  Filter_Changed, 5);
-        RegisterMouseWheel(SldReso,    Filter_Changed, 5);
-        RegisterMouseWheel(SldEnvAmt,  Filter_Changed, 5);
+        RegisterMouseWheel(SldCutoff,  Filter_Changed, 2);
+        RegisterMouseWheel(SldReso,    Filter_Changed, 2);
+        RegisterMouseWheel(SldEnvAmt,  Filter_Changed, 2);
         RegisterMouseWheel(SldLevel,   Level_Changed,  5);
         RegisterMouseWheel(SldA,       Env_Changed,    2);
         RegisterMouseWheel(SldD,       Env_Changed,    2);
@@ -89,6 +107,7 @@ public partial class MainWindow : Window
         ApplyFilter();
         ApplyFilterEnv();
         ApplyEnvelope();
+        DebugLog($"=== SINTO started. Log: {LOG_PATH} ===");
     }
 
     void MainWindow_Closed(object? sender, EventArgs e)
@@ -213,6 +232,8 @@ public partial class MainWindow : Window
         if (rect != null)
             rect.Fill = (Brush)FindResource(IsBlackKey(midi) ? "DcoColor" : "VcfColor");
         UpdateDisplay(midi);
+        DebugLog($"NOTE_ON  midi={midi,3} ({MidiName(midi),-4}) " +
+                 $"CUTOFF={SldCutoff.Value,3:F0} RESO={SldReso.Value,3:F0} wave={_current_wave}");
     }
     void ReleaseNote(int midi, Rectangle? rect)
     {
@@ -223,6 +244,7 @@ public partial class MainWindow : Window
             rect.Fill = IsBlackKey(midi)
                 ? new SolidColorBrush(Color.FromRgb(0x1a, 0x1a, 0x1a))
                 : Brushes.WhiteSmoke;
+        DebugLog($"NOTE_OFF midi={midi,3} ({MidiName(midi),-4})");
     }
     static bool IsBlackKey(int midi)
     {
@@ -336,11 +358,26 @@ public partial class MainWindow : Window
     }
     void ApplyFilter()
     {
-        float c = (float)(SldCutoff?.Value ?? 100) / 100f;
-        float r = (float)(SldReso  ?.Value ?? 0) / 100f;
-        float ea = (float)(SldEnvAmt?.Value ?? 0) / 100f;
+        float c  = (float)(SldCutoff?.Value ?? 100) / 100f;
+        float r  = (float)(SldReso  ?.Value ?? 0)   / 100f;
+        float ea = (float)(SldEnvAmt?.Value ?? 0)   / 100f;
         _engine?.SetFilterParams(c, r, _current_filter);
         _engine?.SetFilterEnvAmount(ea);
+        // Internal filter coefficients (mirror of Filter.SetParams logic)
+        const float LN1000 = 6.90775527898214f;
+        float cutoff_factor = _current_filter == FilterKind.Roland
+            ? MathF.Pow(c, 1.7f) : c;
+        float cutoff_hz = 20f * MathF.Exp(LN1000 * cutoff_factor);
+        float k         = r * 4.5f;
+        float g_raw     = 2f * MathF.PI * cutoff_hz / SR;
+        if (g_raw > 0.95f) g_raw = 0.95f;  // fixed cap only, no dynamic k-dependent cap
+        float k_g4      = k * g_raw * g_raw * g_raw * g_raw;
+        double cutoff_val = SldCutoff?.Value ?? 0;
+        double reso_val   = SldReso?.Value   ?? 0;
+        double envamt_val = SldEnvAmt?.Value ?? 0;
+        DebugLog($"DCF mode={_current_filter,-6} " +
+                 $"CUTOFF={cutoff_val,3:F0} RESO={reso_val,3:F0} ENVAMT={envamt_val,3:F0} " +
+                 $"| cutoff_hz={cutoff_hz,6:F0} k={k:F3} g={g_raw:F4} k*g^4={k_g4:F6} (osc_threshold=4.0)");
     }
     void AdjustCutoff(int delta)
     {
