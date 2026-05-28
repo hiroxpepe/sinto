@@ -10,17 +10,16 @@ namespace Sinto.Core.Synth;
 /// <summary>One-pole lowpass parameter smoother. Denormal-safe.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public struct Smoother {
-#nullable enable
-    private const float SLEEP_THRESHOLD = 1e-5f;
-    private const float TWO_PI = 6.28318530717958647692f;
+    const float SLEEP_THRESHOLD = 1e-5f;
+    const float TWO_PI = 6.28318530717958647692f;
 
-    private float _current;
-    private float _target;
-    private float _coeff;
-    private long  _sample_index;
+    float _current;
+    float _target;
+    float _coeff;
+    long  _sample_index;
 
-    public float Current => _current;
-    public float Target  => _target;
+    public float current => _current;
+    public float target  => _target;
 
     public Smoother(float initialValue, float smoothingHz = 20f, int sampleRate = 44100) {
         if (sampleRate <= 0)

@@ -31,7 +31,7 @@ public class ScalerTests
     {
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, new FakeTimeProvider());
-        Assert.That(vs.CurrentTierIndex, Is.EqualTo(0));
+        Assert.That(vs.currentTierIndex, Is.EqualTo(0));
     }
 
     [Test] public void ForceSetTier_ChangesTier()
@@ -39,7 +39,7 @@ public class ScalerTests
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, new FakeTimeProvider());
         vs.ForceSetTier(2);
-        Assert.That(vs.CurrentTierIndex, Is.EqualTo(2));
+        Assert.That(vs.currentTierIndex, Is.EqualTo(2));
     }
 
     [Test] public void ForceSetTier_MaxVoicesIs16AtTier2()
@@ -47,7 +47,7 @@ public class ScalerTests
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, new FakeTimeProvider());
         vs.ForceSetTier(2);
-        Assert.That(vs.CurrentMaxVoices, Is.EqualTo(16));
+        Assert.That(vs.currentMaxVoices, Is.EqualTo(16));
     }
 
     [Test] public void ForceSetTier_MaxVoicesIs24AtTier1()
@@ -55,7 +55,7 @@ public class ScalerTests
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, new FakeTimeProvider());
         vs.ForceSetTier(1);
-        Assert.That(vs.CurrentMaxVoices, Is.EqualTo(24));
+        Assert.That(vs.currentMaxVoices, Is.EqualTo(24));
     }
 
     [Test] public void ForceSetTier_MaxVoicesIs32AtTier0()
@@ -63,7 +63,7 @@ public class ScalerTests
         var vm = new Voices(32, SampleRate);
         var vs = new Scaler(vm, new FakeTimeProvider());
         vs.ForceSetTier(0);
-        Assert.That(vs.CurrentMaxVoices, Is.EqualTo(32));
+        Assert.That(vs.currentMaxVoices, Is.EqualTo(32));
     }
 
     [Test] public void OnCallbackEnd_HighLoad_TierDecreases()
@@ -80,7 +80,7 @@ public class ScalerTests
             fake.AdvanceMs(overloadMs); // deterministic overload
             vs.OnCallbackEnd(BufLen, SampleRate);
         }
-        Assert.That(vs.CurrentTierIndex, Is.GreaterThan(0),
+        Assert.That(vs.currentTierIndex, Is.GreaterThan(0),
             "Tier should decrease under sustained overload.");
     }
 
@@ -95,11 +95,11 @@ public class ScalerTests
 
         // Trigger the first tier-down
         vs.OnCallbackBegin(); fake.AdvanceMs(overloadMs); vs.OnCallbackEnd(BufLen, SampleRate);
-        int tierAfterFirst = vs.CurrentTierIndex;
+        int tierAfterFirst = vs.currentTierIndex;
 
         // Subsequent overload during cooldown must not change tier
         vs.OnCallbackBegin(); fake.AdvanceMs(overloadMs); vs.OnCallbackEnd(BufLen, SampleRate);
-        Assert.That(vs.CurrentTierIndex, Is.EqualTo(tierAfterFirst),
+        Assert.That(vs.currentTierIndex, Is.EqualTo(tierAfterFirst),
             "Cooldown must prevent double tier-down (hunting).");
     }
 
@@ -119,7 +119,7 @@ public class ScalerTests
         vs.OnCallbackBegin(); fake.AdvanceMs(normalMs);   vs.OnCallbackEnd(BufLen, SampleRate);
         vs.OnCallbackBegin(); fake.AdvanceMs(normalMs);   vs.OnCallbackEnd(BufLen, SampleRate);
 
-        Assert.That(vs.CurrentTierIndex, Is.EqualTo(0),
+        Assert.That(vs.currentTierIndex, Is.EqualTo(0),
             "Single-frame overload spike must NOT trigger TierDown. " +
             "Only N consecutive overloads should cause tier change.");
     }
@@ -136,7 +136,7 @@ public class ScalerTests
 
         // First tier down
         vs.OnCallbackBegin(); fake.AdvanceMs(overloadMs); vs.OnCallbackEnd(BufLen, SampleRate);
-        int tierAfterFirst = vs.CurrentTierIndex;
+        int tierAfterFirst = vs.currentTierIndex;
 
         // Run 64 callbacks with low load to exhaust cooldown
         double lowMs = (BufLen / (double)SampleRate) * 1000.0 * 0.3;
@@ -149,7 +149,7 @@ public class ScalerTests
 
         // If cooldown never decremented, tier would be stuck at tierAfterFirst
         // With correct decrement, another tier down is possible
-        Assert.That(vs.CurrentTierIndex, Is.GreaterThanOrEqualTo(tierAfterFirst),
+        Assert.That(vs.currentTierIndex, Is.GreaterThanOrEqualTo(tierAfterFirst),
             "After cooldown expires, tier must be able to change again. " +
             "If stuck, _cooldownRemaining is never being decremented.");
     }
@@ -170,7 +170,7 @@ public class ScalerTests
             fake.AdvanceMs(lowLoadMs);
             vs.OnCallbackEnd(BufLen, SampleRate);
         }
-        Assert.That(vs.CurrentTierIndex, Is.LessThan(1),
+        Assert.That(vs.currentTierIndex, Is.LessThan(1),
             "Tier should increase after sustained low load.");
     }
 }

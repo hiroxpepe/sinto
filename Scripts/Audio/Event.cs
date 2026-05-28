@@ -5,6 +5,8 @@ using System.Runtime.InteropServices;
 
 namespace Sinto.Core.Audio;
 
+/// <summary>Audio-thread event kinds exchanged through the engine queue.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 public enum EventKind : byte {
     None         = 0,  // MUST be 0 — default(Event).Kind is None, not NoteOn
     NoteOn       = 1,
@@ -23,6 +25,8 @@ public enum EventKind : byte {
 // LayoutKind.Sequential (default pack) adds ~1 byte padding → ~20 bytes.
 // This is acceptable: 20 bytes fits easily in a cache line (64 bytes).
 // Do NOT use Pack=1 unless profiling proves it necessary on target hardware.
+/// <summary>Immutable event payload for engine/audio thread communication.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct Event : System.IEquatable<Event> {
     public readonly EventKind Kind;

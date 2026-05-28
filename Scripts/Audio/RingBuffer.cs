@@ -9,15 +9,17 @@ using System.Threading;
 
 namespace Sinto.Core.Audio;
 
+/// <summary>Single-producer single-consumer lock-free ring buffer.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 [StructLayout(LayoutKind.Sequential)]
 public sealed class RingBuffer<T> where T : struct
 {
-    private readonly T[]  _buffer;
-    private readonly int  _mask;
-    private long _p1, _p2, _p3, _p4, _p5, _p6, _p7;
-    private int  _head;
-    private long _p8, _p9, _p10, _p11, _p12, _p13, _p14;
-    private int  _tail;
+    readonly T[]  _buffer;
+    readonly int  _mask;
+    long _p1, _p2, _p3, _p4, _p5, _p6, _p7;
+    int  _head;
+    long _p8, _p9, _p10, _p11, _p12, _p13, _p14;
+    int  _tail;
 
     public RingBuffer(int capacityPow2 = 1024) {
         // Capacity=1 wastes all slots (SPSC sacrifices 1 slot → 0 usable). Minimum is 2.

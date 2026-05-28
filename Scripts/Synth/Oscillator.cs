@@ -9,14 +9,13 @@ namespace Sinto.Core.Synth;
 /// <summary>Band-limited oscillator using polyBLEP for Saw/Square aliasing reduction.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public struct Oscillator {
-#nullable enable
-    private const double TWO_PI    = 6.283185307179586;
-    private const double INV_TWO_PI = 0.15915494309189534;
+    const double TWO_PI    = 6.283185307179586;
+    const double INV_TWO_PI = 0.15915494309189534;
 
-    private double _phase;       // [0, 1) — normalized phase for polyBLEP convenience
-    private double _phase_inc;   // dt per sample [0, 1)
-    private uint   _noise_seed;
-    private float  _last_triangle; // for triangle integrator
+    double _phase;       // [0, 1) — normalized phase for polyBLEP convenience
+    double _phase_inc;   // dt per sample [0, 1)
+    uint   _noise_seed;
+    float  _last_triangle; // for triangle integrator
 
     public void SetFrequency(float frequencyHz, int sampleRate) {
         if (frequencyHz < 0.001f) frequencyHz = 0.001f;
@@ -83,7 +82,7 @@ public struct Oscillator {
 
     /// <summary>polyBLEP: polynomial band-limited step. Corrects discontinuities.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double PolyBlep(double t, double dt) {
+    static double PolyBlep(double t, double dt) {
         // t and dt are normalized to [0, 1)
         if (t < dt) {
             double x = t / dt;

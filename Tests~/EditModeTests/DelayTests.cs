@@ -16,23 +16,23 @@ public class DelayTests
     [Test] public void Process_DoesNotThrow()
     {
         var d = new Delay(44100);
-        d.Time = 0.5f; d.Feedback = 0.5f; d.Mix = 0.5f; d.Enabled = true;
+        d.time = 0.5f; d.feedback = 0.5f; d.mix = 0.5f; d.enabled = true;
         var buf = new float[1024];
         Assert.DoesNotThrow(() => d.Process(buf.AsSpan(), 2));
     }
 
     [Test] public void Feedback_ClampedTo0_95()
     {
-        // Feedback >= 1.0 → infinite loop → buffer overflow → app death
+        // feedback >= 1.0 → infinite loop → buffer overflow → app death
         var d = new Delay(44100);
-        d.Time = 0.25f; d.Mix = 0.5f; d.Enabled = true;
-        d.Feedback = 1.0f; // must be clamped to 0.95 internally
+        d.time = 0.25f; d.mix = 0.5f; d.enabled = true;
+        d.feedback = 1.0f; // must be clamped to 0.95 internally
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = 0.5f;
         Assert.DoesNotThrow(() => {
             for (int frame = 0; frame < 100; frame++)
                 d.Process(buf.AsSpan(), 2);
-        }, "Feedback = 1.0 must not cause infinite feedback runaway.");
+        }, "feedback = 1.0 must not cause infinite feedback runaway.");
         foreach (float s in buf)
             Assert.That(float.IsNaN(s) || float.IsInfinity(s), Is.False,
                 "Output must be finite even with feedback = 1.0 (clamped to 0.95).");
@@ -45,7 +45,7 @@ public class DelayTests
         // Verify: output samples immediately after time change are within [-1, 1]
         // and do not jump by more than 0.5 per sample (click threshold).
         var d = new Delay(44100);
-        d.Time = 0.5f; d.Feedback = 0.3f; d.Mix = 0.5f; d.Enabled = true;
+        d.time = 0.5f; d.feedback = 0.3f; d.mix = 0.5f; d.enabled = true;
 
         // Feed a steady sine-like signal for 1 second to fill the delay buffer
         var buf = new float[512];
@@ -54,7 +54,7 @@ public class DelayTests
             d.Process(buf.AsSpan(), 2);
 
         // Change time abruptly
-        d.Time = 0.1f;
+        d.time = 0.1f;
 
         // Capture output immediately after time change
         var afterChange = new float[512];
@@ -80,7 +80,7 @@ public class DelayTests
     [Test] public void Reset_ClearsBuffer()
     {
         var d = new Delay(44100);
-        d.Time = 0.25f; d.Feedback = 0.5f; d.Mix = 1.0f; d.Enabled = true;
+        d.time = 0.25f; d.feedback = 0.5f; d.mix = 1.0f; d.enabled = true;
         var buf = new float[512];
         for (int i = 0; i < buf.Length; i++) buf[i] = 1.0f;
         d.Process(buf.AsSpan(), 2);
@@ -98,8 +98,8 @@ public class DelayTests
         // Verify: two separate instances have independent buffers.
         var d1 = new Delay(44100);
         var d2 = new Delay(44100);
-        d1.Time = 0.5f; d1.Mix = 1.0f; d1.Enabled = true;
-        d2.Time = 0.25f; d2.Mix = 1.0f; d2.Enabled = true;
+        d1.time = 0.5f; d1.mix = 1.0f; d1.enabled = true;
+        d2.time = 0.25f; d2.mix = 1.0f; d2.enabled = true;
 
         var buf1 = new float[512];
         var buf2 = new float[512];

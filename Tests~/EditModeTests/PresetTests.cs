@@ -18,25 +18,25 @@ public class PresetTests
     [Test] public void Default_HasNonNullSubPresets()
     {
         var p = Sinto.Core.Preset.Preset.Default;
-        Assert.That(p.Osc1,           Is.Not.Null);
-        Assert.That(p.Osc2,           Is.Not.Null);
-        Assert.That(p.Filter,         Is.Not.Null);
-        Assert.That(p.AmpEnvelope,    Is.Not.Null);
-        Assert.That(p.FilterEnvelope, Is.Not.Null);
-        Assert.That(p.PitchEnvelope,  Is.Not.Null);
-        Assert.That(p.Lfo1,           Is.Not.Null);
-        Assert.That(p.Lfo2,           Is.Not.Null);
-        Assert.That(p.Effects,        Is.Not.Null);
+        Assert.That(p.osc1,           Is.Not.Null);
+        Assert.That(p.osc2,           Is.Not.Null);
+        Assert.That(p.filter,         Is.Not.Null);
+        Assert.That(p.amp_envelope,    Is.Not.Null);
+        Assert.That(p.filter_envelope, Is.Not.Null);
+        Assert.That(p.pitch_envelope,  Is.Not.Null);
+        Assert.That(p.lfo1,           Is.Not.Null);
+        Assert.That(p.lfo2,           Is.Not.Null);
+        Assert.That(p.effects,        Is.Not.Null);
     }
 
     [Test] public void Default_Name_IsNotEmpty()
-        => Assert.That(Sinto.Core.Preset.Preset.Default.Name, Is.Not.Empty);
+        => Assert.That(Sinto.Core.Preset.Preset.Default.name, Is.Not.Empty);
 
     [Test] public void Default_PortamentoTime_IsZero()
-        => Assert.That(Sinto.Core.Preset.Preset.Default.PortamentoTime, Is.EqualTo(0f).Within(1e-6f));
+        => Assert.That(Sinto.Core.Preset.Preset.Default.portamento_time, Is.EqualTo(0f).Within(1e-6f));
 
     [Test] public void Default_RetroMode_IsClean()
-        => Assert.That(Sinto.Core.Preset.Preset.Default.RetroMode, Is.EqualTo(RetroMode.Clean));
+        => Assert.That(Sinto.Core.Preset.Preset.Default.retro_mode, Is.EqualTo(RetroMode.Clean));
 }
 
 // ── OscPreset ─────────────────────────────────────────────────────────
@@ -45,13 +45,13 @@ public class PresetTests
 public class OscPresetTests
 {
     [Test] public void Default_WaveType_IsSine()
-        => Assert.That(OscPreset.Default.Wave, Is.EqualTo(WaveType.Sine));
+        => Assert.That(OscPreset.Default.wave, Is.EqualTo(WaveType.Sine));
 
     [Test] public void Default_Level_IsOne()
-        => Assert.That(OscPreset.Default.Level, Is.EqualTo(1.0f).Within(1e-6f));
+        => Assert.That(OscPreset.Default.level, Is.EqualTo(1.0f).Within(1e-6f));
 
     [Test] public void Default_PulseWidth_IsHalf()
-        => Assert.That(OscPreset.Default.PulseWidth, Is.EqualTo(0.5f).Within(1e-6f));
+        => Assert.That(OscPreset.Default.pulse_width, Is.EqualTo(0.5f).Within(1e-6f));
 }
 
 // ── FilterPreset ─────────────────────────────────────────────────────────────
@@ -60,13 +60,13 @@ public class OscPresetTests
 public class FilterPresetTests
 {
     [Test] public void Default_Mode_IsRoland()
-        => Assert.That(FilterPreset.Default.Mode, Is.EqualTo(FilterKind.Roland));
+        => Assert.That(FilterPreset.Default.mode, Is.EqualTo(FilterKind.Roland));
 
     [Test] public void Default_Cutoff_IsOpen()
-        => Assert.That(FilterPreset.Default.Cutoff, Is.EqualTo(1.0f).Within(1e-6f));
+        => Assert.That(FilterPreset.Default.cutoff, Is.EqualTo(1.0f).Within(1e-6f));
 
     [Test] public void Default_Resonance_IsZero()
-        => Assert.That(FilterPreset.Default.Resonance, Is.EqualTo(0f).Within(1e-6f));
+        => Assert.That(FilterPreset.Default.resonance, Is.EqualTo(0f).Within(1e-6f));
 }
 
 // ── EnvPreset ───────────────────────────────────────────────────────────
@@ -77,17 +77,17 @@ public class EnvPresetTests
     [Test] public void Default_AllValuesArePositive()
     {
         var p = EnvPreset.Default;
-        Assert.That(p.Attack,  Is.GreaterThan(0f));
-        Assert.That(p.Decay,   Is.GreaterThan(0f));
-        Assert.That(p.Sustain, Is.GreaterThanOrEqualTo(0f));
-        Assert.That(p.Release, Is.GreaterThan(0f));
+        Assert.That(p.attack,  Is.GreaterThan(0f));
+        Assert.That(p.decay,   Is.GreaterThan(0f));
+        Assert.That(p.sustain, Is.GreaterThanOrEqualTo(0f));
+        Assert.That(p.release, Is.GreaterThan(0f));
     }
 
     [Test] public void Percussive_SustainIsZero()
-        => Assert.That(EnvPreset.Percussive.Sustain, Is.EqualTo(0f).Within(1e-6f));
+        => Assert.That(EnvPreset.Percussive.sustain, Is.EqualTo(0f).Within(1e-6f));
 
     [Test] public void Pad_AttackIsLong()
-        => Assert.That(EnvPreset.Pad.Attack, Is.GreaterThan(0.3f));
+        => Assert.That(EnvPreset.Pad.attack, Is.GreaterThan(0.3f));
 }
 
 // ── LfoPreset ────────────────────────────────────────────────────────────────
@@ -96,13 +96,13 @@ public class EnvPresetTests
 public class LfoPresetTests
 {
     [Test] public void Default_DepthIsZero()
-        => Assert.That(LfoPreset.Default.Depth, Is.EqualTo(0f).Within(1e-6f));
+        => Assert.That(LfoPreset.Default.depth, Is.EqualTo(0f).Within(1e-6f));
 
     [Test] public void Default_TempoSyncIsFalse()
-        => Assert.That(LfoPreset.Default.TempoSync, Is.False);
+        => Assert.That(LfoPreset.Default.tempo_sync, Is.False);
 
     [Test] public void Default_DestinationIsNone()
-        => Assert.That(LfoPreset.Default.Destinations, Is.EqualTo(LfoTarget.None));
+        => Assert.That(LfoPreset.Default.destinations, Is.EqualTo(LfoTarget.None));
 }
 
 // ── FxPreset ────────────────────────────────────────────────────────────
@@ -113,16 +113,16 @@ public class FxPresetTests
     [Test] public void Default_AllMixAreZero()
     {
         var p = FxPreset.Default;
-        Assert.That(p.ChorusMix,  Is.EqualTo(0f).Within(1e-6f));
-        Assert.That(p.ReverbMix,  Is.EqualTo(0f).Within(1e-6f));
-        Assert.That(p.DelayMix,   Is.EqualTo(0f).Within(1e-6f));
+        Assert.That(p.chorus_mix,  Is.EqualTo(0f).Within(1e-6f));
+        Assert.That(p.reverb_mix,  Is.EqualTo(0f).Within(1e-6f));
+        Assert.That(p.delay_mix,   Is.EqualTo(0f).Within(1e-6f));
     }
 
     [Test] public void Default_DelayFeedback_BelowMaximum()
-        => Assert.That(FxPreset.Default.DelayFeedback, Is.LessThanOrEqualTo(0.95f));
+        => Assert.That(FxPreset.Default.delay_feedback, Is.LessThanOrEqualTo(0.95f));
 
     [Test] public void Default_RetroMode_IsClean()
-        => Assert.That(FxPreset.Default.RetroMode, Is.EqualTo(RetroMode.Clean));
+        => Assert.That(FxPreset.Default.retro_mode, Is.EqualTo(RetroMode.Clean));
 }
 
 // ── Validator ──────────────────────────────────────────────────────────
@@ -136,51 +136,51 @@ public class ValidatorTests
     [Test] public void Validate_OscPulseWidth_ClampedTo0_01_0_99()
     {
         var raw = new Sinto.Core.Preset.Preset {
-            Osc1 = new OscPreset { PulseWidth = 0.0f } // below min
+            osc1 = new OscPreset { pulse_width = 0.0f } // below min
         };
         var validated = Validator.Validate(raw);
-        Assert.That(validated.Osc1.PulseWidth, Is.GreaterThanOrEqualTo(0.01f),
-            "PulseWidth below 0.01 must be clamped.");
+        Assert.That(validated.osc1.pulse_width, Is.GreaterThanOrEqualTo(0.01f),
+            "pulse_width below 0.01 must be clamped.");
     }
 
     [Test] public void Validate_FilterCutoff_ClampedTo0_001_0_999()
     {
         var raw = new Sinto.Core.Preset.Preset {
-            Filter = new FilterPreset { Cutoff = 2.0f } // above max
+            filter = new FilterPreset { cutoff = 2.0f } // above max
         };
         var validated = Validator.Validate(raw);
-        Assert.That(validated.Filter.Cutoff, Is.LessThanOrEqualTo(0.999f),
-            "Cutoff above 0.999 must be clamped.");
+        Assert.That(validated.filter.cutoff, Is.LessThanOrEqualTo(0.999f),
+            "cutoff above 0.999 must be clamped.");
     }
 
     [Test] public void Validate_EnvelopeAttack_ClampedToMinimum()
     {
         var raw = new Sinto.Core.Preset.Preset {
-            AmpEnvelope = new EnvPreset { Attack = 0.0f }
+            amp_envelope = new EnvPreset { attack = 0.0f }
         };
         var validated = Validator.Validate(raw);
-        Assert.That(validated.AmpEnvelope.Attack, Is.GreaterThanOrEqualTo(0.001f),
-            "Attack = 0 must be clamped to prevent division by zero.");
+        Assert.That(validated.amp_envelope.attack, Is.GreaterThanOrEqualTo(0.001f),
+            "attack = 0 must be clamped to prevent division by zero.");
     }
 
     [Test] public void Validate_DelayFeedback_ClampedTo0_95()
     {
         var raw = new Sinto.Core.Preset.Preset {
-            Effects = new FxPreset { DelayFeedback = 1.0f }
+            effects = new FxPreset { delay_feedback = 1.0f }
         };
         var validated = Validator.Validate(raw);
-        Assert.That(validated.Effects.DelayFeedback, Is.LessThanOrEqualTo(0.95f),
+        Assert.That(validated.effects.delay_feedback, Is.LessThanOrEqualTo(0.95f),
             "Delay feedback >= 1.0 must be clamped to prevent runaway.");
     }
 
     [Test] public void Validate_FilterResonance_ClampedTo0_1()
     {
         var raw = new Sinto.Core.Preset.Preset {
-            Filter = new FilterPreset { Resonance = 5.0f }
+            filter = new FilterPreset { resonance = 5.0f }
         };
         var validated = Validator.Validate(raw);
-        Assert.That(validated.Filter.Resonance, Is.LessThanOrEqualTo(1.0f));
-        Assert.That(validated.Filter.Resonance, Is.GreaterThanOrEqualTo(0.0f));
+        Assert.That(validated.filter.resonance, Is.LessThanOrEqualTo(1.0f));
+        Assert.That(validated.filter.resonance, Is.GreaterThanOrEqualTo(0.0f));
     }
 }
 
@@ -219,10 +219,10 @@ public class LoaderTests
     [Test] public void LoadFromBytes_ValidJson_ReturnsPreset()
     {
         var json = System.Text.Encoding.UTF8.GetBytes(
-            """{"Name":"TestPreset","Version":"1.0"}""");
+            """{"name":"TestPreset","version":"1.0"}""");
         var result = Loader.LoadFromBytes(json.AsSpan());
         Assert.That(result, Is.Not.Null);
-        Assert.That(result.Name, Is.EqualTo("TestPreset"));
+        Assert.That(result.name, Is.EqualTo("TestPreset"));
     }
 
     [Test] public void Load_ValidatedPreset_HasSafeValues()
@@ -232,11 +232,11 @@ public class LoaderTests
         try {
             // Write a preset with out-of-range values
             File.WriteAllText(tmp,
-                """{"Name":"Extreme","Filter":{"Cutoff":999.0,"Resonance":-5.0}}""");
+                """{"name":"Extreme","filter":{"cutoff":999.0,"resonance":-5.0}}""");
             var result = Loader.Load(tmp);
             // Validation must have been applied
-            Assert.That(result.Filter.Cutoff,    Is.LessThanOrEqualTo(0.999f));
-            Assert.That(result.Filter.Resonance, Is.GreaterThanOrEqualTo(0.0f));
+            Assert.That(result.filter.cutoff,    Is.LessThanOrEqualTo(0.999f));
+            Assert.That(result.filter.resonance, Is.GreaterThanOrEqualTo(0.0f));
         } finally {
             File.Delete(tmp);
         }

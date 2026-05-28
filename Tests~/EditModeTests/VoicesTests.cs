@@ -17,7 +17,7 @@ public class VoicesTests
     [Test] public void Constructor_ActiveVoicesIsZero()
     {
         var vm = new Voices(32, 44100);
-        Assert.That(vm.ActiveVoices, Is.EqualTo(0));
+        Assert.That(vm.activeVoices, Is.EqualTo(0));
     }
 
     [Test] public void NoteOn_ActiveVoicesIncreases()
@@ -25,7 +25,7 @@ public class VoicesTests
         var vm = new Voices(32, 44100);
         vm.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             EnvParams.Default, EnvParams.Default, EnvParams.Default);
-        Assert.That(vm.ActiveVoices, Is.GreaterThan(0));
+        Assert.That(vm.activeVoices, Is.GreaterThan(0));
     }
 
     [Test] public void NoteOff_MatchingNote_TransitionsToRelease()
@@ -57,14 +57,14 @@ public class VoicesTests
         for (int i = 0; i < 40; i++)
             vm.NoteOn(MakeNote(60 + (i % 12), i % 8), DefaultOsc(), DefaultOsc(),
                 EnvParams.Default, EnvParams.Default, EnvParams.Default);
-        Assert.That(vm.ActiveVoices, Is.LessThanOrEqualTo(32));
+        Assert.That(vm.activeVoices, Is.LessThanOrEqualTo(32));
     }
 
     [Test] public void SetMaxVoices_ReducesLimit()
     {
         var vm = new Voices(32, 44100);
         vm.SetMaxVoices(16);
-        Assert.That(vm.MaxVoices, Is.EqualTo(16));
+        Assert.That(vm.maxVoices, Is.EqualTo(16));
     }
 
     [Test] public void RenderSamples_MultipleVoices_OutputDoesNotExceedPlusMinusOne()
@@ -101,13 +101,13 @@ public class VoicesTests
     {
         // Verifies that Voices mutates _voices[i] in-place (ref var),
         // not a local copy (var). If PlayState changes don't persist,
-        // ActiveVoices stays 0 after NoteOn — pool exhaustion in seconds.
+        // activeVoices stays 0 after NoteOn — pool exhaustion in seconds.
         var vm = new Voices(32, 44100);
-        Assert.That(vm.ActiveVoices, Is.EqualTo(0));
+        Assert.That(vm.activeVoices, Is.EqualTo(0));
         vm.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             EnvParams.Default, EnvParams.Default, EnvParams.Default);
-        Assert.That(vm.ActiveVoices, Is.GreaterThan(0),
-            "ActiveVoices must reflect the in-array state change. " +
+        Assert.That(vm.activeVoices, Is.GreaterThan(0),
+            "activeVoices must reflect the in-array state change. " +
             "If 0, Voices is mutating a struct copy, not the array element.");
     }
 
@@ -194,7 +194,7 @@ public class VoicesTests
         vm.NoteOn(new Note(60, 0.8f, 2, 5), DefaultOsc(), DefaultOsc(),
             longEnv, EnvParams.Default, EnvParams.Default);
 
-        int before = vm.ActiveVoices;
+        int before = vm.activeVoices;
         Assert.That(before, Is.GreaterThanOrEqualTo(1), "At least 1 voice should be active.");
 
         vm.NoteOff(60, 2); // single NoteOff must release ALL matching voices
@@ -248,12 +248,12 @@ public class VoicesTests
         //
         // If Voices forgets to call SmoothedCutoff.SnapToTarget() on NoteOn,
         // GetVoiceCurrentCutoff returns 0.1 (previous voice state) instead of 0.9.
-        const int MaxVoices = 4;
-        var vm = new Voices(MaxVoices, 44100);
+        const int maxVoices = 4;
+        var vm = new Voices(maxVoices, 44100);
 
         // Fill all voices with notes using Cutoff 0.1
         vm.SetFilterParams(0.1f, 0.3f, FilterKind.Roland);
-        for (int i = 0; i < MaxVoices; i++)
+        for (int i = 0; i < maxVoices; i++)
             vm.NoteOn(new Note(60 + i, 0.8f, 2, 5), DefaultOsc(), DefaultOsc(),
                 new EnvParams(0.001f, 0.1f, 0.8f, 0.1f),
                 EnvParams.Default, EnvParams.Default);
@@ -264,7 +264,7 @@ public class VoicesTests
             new EnvParams(0.001f, 0.1f, 0.8f, 0.1f),
             EnvParams.Default, EnvParams.Default);
 
-        // The new voice's SmoothedCutoff.Current must be 0.9 (snapped), not 0.1 (old value)
+        // The new voice's SmoothedCutoff.current must be 0.9 (snapped), not 0.1 (old value)
         float cutoff = vm.GetVoiceCurrentCutoff(72, 2);
         Assert.That(cutoff, Is.Not.EqualTo(-1f), "No active voice found for MIDI 72.");
         Assert.That(cutoff, Is.EqualTo(0.9f).Within(1e-4f),
@@ -301,7 +301,7 @@ public class VoicesTests
     [Test] public void DrumTrack_NoteIsNeverStolenByOtherTrack()
     {
         // Verify that drum track (0) cannot be stolen by other tracks.
-        // Checking ActiveVoices count alone is insufficient — a drum voice may have been
+        // Checking activeVoices count alone is insufficient — a drum voice may have been
         // replaced. Use IsNoteActive() to verify drum notes are still alive.
         var vm = new Voices(4, 44100); // Tiny voice pool to force stealing
 

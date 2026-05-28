@@ -9,13 +9,16 @@ namespace Sinto.Core.Synth;
 /// Production: SystemTimer (real Stopwatch).
 /// Test: FakeTimeProvider (manually controlled ticks).
 /// </summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 public interface ITimer {
     long GetTimestamp();
-    long Frequency { get; }
+    long frequency { get; }
 }
 
+/// <summary>System stopwatch-backed timer implementation.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class SystemTimer : ITimer {
     public static readonly SystemTimer Instance = new();
     public long GetTimestamp() => System.Diagnostics.Stopwatch.GetTimestamp();
-    public long Frequency     => System.Diagnostics.Stopwatch.Frequency;
+    public long frequency     => System.Diagnostics.Stopwatch.Frequency;
 }

@@ -52,9 +52,9 @@ public class VoiceTests
         var v = new Voice();
         v.NoteOn(MakeNote(), DefaultOsc(), DefaultOsc(),
             DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
-        // SmoothedCutoff.Current must equal SmoothedCutoff.Target (snapped)
-        Assert.That(v.SmoothedCutoff.Current,
-            Is.EqualTo(v.SmoothedCutoff.Target).Within(1e-4f),
+        // SmoothedCutoff.current must equal SmoothedCutoff.target (snapped)
+        Assert.That(v.SmoothedCutoff.current,
+            Is.EqualTo(v.SmoothedCutoff.target).Within(1e-4f),
             "SmoothedCutoff must be snapped on NoteOn.");
     }
 
@@ -98,7 +98,7 @@ public class VoiceTests
     [Test] public void CurrentAmplitude_Initially_IsZero()
     {
         var v = new Voice();
-        Assert.That(v.CurrentAmplitude, Is.EqualTo(0f).Within(1e-6f));
+        Assert.That(v.currentAmplitude, Is.EqualTo(0f).Within(1e-6f));
     }
 
     [Test] public void NoteOn_PortamentoZero_SnapsFrequency()
@@ -108,7 +108,7 @@ public class VoiceTests
         v.NoteOn(MakeNote(69), DefaultOsc(), DefaultOsc(),
             DefaultEnv(), DefaultEnv(), DefaultEnv(), 0f, SR);
         // After NoteOn with zero portamento, frequency must be at target immediately
-        Assert.That(v.Portamento.IsGliding, Is.False,
+        Assert.That(v.Portamento.isGliding, Is.False,
             "portamentoTime=0 must not start glide.");
     }
 

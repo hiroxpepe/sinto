@@ -10,12 +10,12 @@ namespace Sinto.Core.Synth;
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public struct Portamento {
 #nullable enable
-    private float _current_freq;
-    private float _target_freq;
-    private float _rate;
+    float _current_freq;
+    float _target_freq;
+    float _rate;
 
-    public float CurrentFrequency => _current_freq;
-    public bool  IsGliding => _current_freq != _target_freq;
+    public float currentFrequency => _current_freq;
+    public bool  isGliding => _current_freq != _target_freq;
 
     public void SetTarget(float targetFreqHz, float timeSeconds, int sampleRate) {
         if (sampleRate <= 0) sampleRate = 44100;

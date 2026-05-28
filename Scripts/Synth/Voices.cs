@@ -8,28 +8,27 @@ namespace Sinto.Core.Synth;
 /// <summary>Voice manager (polyphony). 32-voice pool with priority-based stealing.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Voices {
-#nullable enable
-    private readonly Voice[] _voices;
-    private int   _max_voices;
-    private int   _sample_rate;
-    private float _current_bpm;
-    private float _filter_cutoff_base;
-    private float _filter_resonance_base;
-    private float _portamento_time;
-    private FilterKind _filter_mode;
-    private bool  _sustain_pedal_down;
-    private float _osc1_level = 1.0f;
-    private float _osc2_level = 0.5f;
-    private float _detune_cents = 0f;
-    private float _filter_env_amount;
-    private EnvParams _filter_env_params = new EnvParams(0.01f, 0.3f, 0f, 0.2f);
-    private LfoParams _lfo1_params;
-    private LfoParams _lfo2_params;
-    private Lfo _lfo1;
-    private Lfo _lfo2;
+    readonly Voice[] _voices;
+    int   _max_voices;
+    int   _sample_rate;
+    float _current_bpm;
+    float _filter_cutoff_base;
+    float _filter_resonance_base;
+    float _portamento_time;
+    FilterKind _filter_mode;
+    bool  _sustain_pedal_down;
+    float _osc1_level = 1.0f;
+    float _osc2_level = 0.5f;
+    float _detune_cents = 0f;
+    float _filter_env_amount;
+    EnvParams _filter_env_params = new EnvParams(0.01f, 0.3f, 0f, 0.2f);
+    LfoParams _lfo1_params;
+    LfoParams _lfo2_params;
+    Lfo _lfo1;
+    Lfo _lfo2;
 
-    public int MaxVoices    => _max_voices;
-    public int ActiveVoices {
+    public int maxVoices    => _max_voices;
+    public int activeVoices {
         get {
             int count = 0;
             for (int i = 0; i < _max_voices; i++)
@@ -185,7 +184,7 @@ public sealed class Voices {
             if (v.State != PlayState.Free &&
                 v.ActiveNote.MidiNote == midiNote &&
                 v.ActiveNote.TrackId  == trackId) {
-                return v.SmoothedCutoff.Current;
+                return v.SmoothedCutoff.current;
             }
         }
         return -1f;
@@ -236,14 +235,14 @@ public sealed class Voices {
         }
     }
 
-    private int FindFreeVoice() {
+    int FindFreeVoice() {
         for (int i = 0; i < _max_voices; i++) {
             if (_voices[i].State == PlayState.Free) return i;
         }
         return -1;
     }
 
-    private int FindStealVictim(int requestingTrack, int requestingPriority) {
+    int FindStealVictim(int requestingTrack, int requestingPriority) {
         // Find lowest priority non-protected voice
         // Protected tracks (Drum/Perc) can only be stolen by same track
         var req_config = TrackConfig.GetConfig(requestingTrack);

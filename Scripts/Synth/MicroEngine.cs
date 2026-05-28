@@ -10,21 +10,20 @@ namespace Sinto.Core.Synth;
 /// <summary>Lightweight single-voice SFX processor. Mono → stereo duplicate.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class MicroEngine {
-#nullable enable
     // Minimal SPSC (4 slots) — prevents main/audio thread data race on Voice struct.
     // Main thread: NoteOn/NoteOff → enqueue event.
     // Audio thread: RenderMono → dequeue and apply events.
-    private readonly RingBuffer<Event> _events;
-    private Voice  _voice;
-    private readonly Chorus _chorus;
-    private readonly Retro  _retro;
-    private readonly int    _sample_rate;
-    private OscParams _osc1_params;
-    private OscParams _osc2_params;
-    private EnvParams _amp_params;
-    private readonly LfoParams _lfo_silent;  // no modulation for SFX
+    readonly RingBuffer<Event> _events;
+    Voice  _voice;
+    readonly Chorus _chorus;
+    readonly Retro  _retro;
+    readonly int    _sample_rate;
+    OscParams _osc1_params;
+    OscParams _osc2_params;
+    EnvParams _amp_params;
+    readonly LfoParams _lfo_silent;  // no modulation for SFX
 
-    public bool IsActive => _voice.State != PlayState.Free;
+    public bool isActive => _voice.State != PlayState.Free;
 
     public MicroEngine(int sample_rate = 44100) {
         if (sample_rate <= 0) sample_rate = 44100;

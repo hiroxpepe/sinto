@@ -9,18 +9,17 @@ namespace Sinto.Core.Effects;
 /// <summary>BBD-style chorus with modulated delay lines.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Chorus : MonoEffect {
-#nullable enable
-    private readonly float[] _delay_l;
-    private readonly float[] _delay_r;
-    private int   _write_pos;
-    private double _lfo_phase;
-    private readonly int _sample_rate;
-    private readonly int _max_delay_samples;
+    readonly float[] _delay_l;
+    readonly float[] _delay_r;
+    int   _write_pos;
+    double _lfo_phase;
+    readonly int _sample_rate;
+    readonly int _max_delay_samples;
 
-    public int   Mode  { get; set; } = 1;
-    public float Rate  { get; set; } = 0.5f;
-    public float Depth { get; set; } = 0.4f;
-    public float Mix   { get; set; } = 0.5f;
+    public int   mode  { get; set; } = 1;
+    public float rate  { get; set; } = 0.5f;
+    public float depth { get; set; } = 0.4f;
+    public float mix   { get; set; } = 0.5f;
 
     public Chorus(int sampleRate = 44100) {
         if (sampleRate <= 0) sampleRate = 44100;
@@ -33,13 +32,13 @@ public sealed class Chorus : MonoEffect {
     }
 
     public override void Process(Span<float> buffer, int channels) {
-        if (!Enabled || Mix <= 0f) return;
+        if (!enabled || mix <= 0f) return;
         if (channels < 1) channels = 1;
         int frames = buffer.Length / channels;
-        double lfo_inc = 2.0 * Math.PI * Rate / _sample_rate;
+        double lfo_inc = 2.0 * Math.PI * rate / _sample_rate;
         // Base delay = 15ms
         float base_delay = _sample_rate * 0.015f;
-        float depth_samples = base_delay * Depth;
+        float depth_samples = base_delay * depth;
         for (int f = 0; f < frames; f++) {
             float lfo_val = (float)Math.Sin(_lfo_phase);
             _lfo_phase += lfo_inc;
@@ -57,15 +56,15 @@ public sealed class Chorus : MonoEffect {
             _delay_l[_write_pos] = dry_l;
             _delay_r[_write_pos] = dry_r;
             _write_pos = (_write_pos + 1) % _max_delay_samples;
-            // Mix
-            buffer[i] = dry_l * (1f - Mix) + read_l * Mix;
+            // mix
+            buffer[i] = dry_l * (1f - mix) + read_l * mix;
             if (channels >= 2)
-                buffer[i + 1] = dry_r * (1f - Mix) + read_r * Mix;
+                buffer[i + 1] = dry_r * (1f - mix) + read_r * mix;
         }
         ApplyMonoCompatibility(buffer, channels);
     }
 
-    private float ReadDelay(float[] buf, float samples) {
+    float ReadDelay(float[] buf, float samples) {
         if (samples < 1f) samples = 1f;
         if (samples > _max_delay_samples - 1) samples = _max_delay_samples - 1;
         int idx = (int)samples;

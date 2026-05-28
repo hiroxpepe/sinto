@@ -8,18 +8,17 @@ namespace Sinto.Core.Synth;
 /// <summary>ADSR envelope state machine. Zero-attack bypass for SFX.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public struct Envelope {
-#nullable enable
-    private float     _level;
-    private PlayState _phase;
-    private float     _attack_rate;
-    private float     _decay_rate;
-    private float     _release_rate;
-    private float     _sustain_level;
-    private float     _quick_release_rate;
+    float     _level;
+    PlayState _phase;
+    float     _attack_rate;
+    float     _decay_rate;
+    float     _release_rate;
+    float     _sustain_level;
+    float     _quick_release_rate;
 
-    public float     Level => _level;
-    public PlayState Phase => _phase;
-    public bool      IsDone => _phase == PlayState.Free;
+    public float     level => _level;
+    public PlayState phase => _phase;
+    public bool      isDone => _phase == PlayState.Free;
 
     public void NoteOn(in EnvParams p, int sampleRate) {
         if (sampleRate <= 0) sampleRate = 44100;

@@ -9,16 +9,15 @@ namespace Sinto.Core.Synth;
 /// <summary>Fast DSP math: SinFast / TanhFast / PitchRatioFast.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public static class Calc {
-#nullable enable
     public const int LUT_SIZE = 4096;
-    private const float TWO_PI = 6.28318530717958647692f;
-    private const float INV_TWO_PI = 0.15915494309189534f;
-    private const float LN2_DIV_12 = 0.05776226504666215f; // ln(2)/12
+    const float TWO_PI = 6.28318530717958647692f;
+    const float INV_TWO_PI = 0.15915494309189534f;
+    const float LN2_DIV_12 = 0.05776226504666215f; // ln(2)/12
 
-    private static readonly float[] _sin_lut    = new float[LUT_SIZE];
-    private static bool _initialized;
+    static readonly float[] _sin_lut    = new float[LUT_SIZE];
+    static bool _initialized;
 
-    public static bool IsLutMode { get; private set; } = true;
+    public static bool isLutMode { get; set; } = true;
 
     /// <summary>Initialize sine LUT. Safe to call multiple times.</summary>
     public static void Initialize() {

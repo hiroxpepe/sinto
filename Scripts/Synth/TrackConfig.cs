@@ -6,6 +6,8 @@ using System.Runtime.InteropServices;
 
 namespace Sinto.Core.Synth;
 
+/// <summary>Per-track voice reservation and stealing policy.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct TrackConfig {
     public readonly int  ReservedVoices;

@@ -8,22 +8,21 @@ namespace Sinto.Core.Effects;
 /// <summary>Freeverb-style reverb. 4 comb filters + 2 allpass per channel.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Reverb : MonoEffect {
-#nullable enable
-    private static readonly int[] COMB_TUNINGS = { 1116, 1188, 1277, 1356 };
-    private static readonly int[] AP_TUNINGS = { 556, 441 };
+    static readonly int[] COMB_TUNINGS = { 1116, 1188, 1277, 1356 };
+    static readonly int[] AP_TUNINGS = { 556, 441 };
 
-    private readonly float[][] _comb_l;
-    private readonly float[][] _comb_r;
-    private readonly float[][] _ap_l;
-    private readonly float[][] _ap_r;
-    private readonly int[] _comb_pos;
-    private readonly int[] _ap_pos;
-    private readonly float[] _comb_filterstore_l;
-    private readonly float[] _comb_filterstore_r;
+    readonly float[][] _comb_l;
+    readonly float[][] _comb_r;
+    readonly float[][] _ap_l;
+    readonly float[][] _ap_r;
+    readonly int[] _comb_pos;
+    readonly int[] _ap_pos;
+    readonly float[] _comb_filterstore_l;
+    readonly float[] _comb_filterstore_r;
 
-    public float RoomSize { get; set; } = 0.5f;
-    public float Damping  { get; set; } = 0.5f;
-    public float Mix      { get; set; } = 0.3f;
+    public float roomSize { get; set; } = 0.5f;
+    public float damping  { get; set; } = 0.5f;
+    public float mix      { get; set; } = 0.3f;
 
     public Reverb() {
         _comb_l = new float[4][];
@@ -45,11 +44,11 @@ public sealed class Reverb : MonoEffect {
     }
 
     public override void Process(Span<float> buffer, int channels) {
-        if (!Enabled || Mix <= 0f) return;
+        if (!enabled || mix <= 0f) return;
         if (channels < 1) channels = 1;
         int frames = buffer.Length / channels;
-        float feedback = 0.7f + RoomSize * 0.28f;
-        float damp = Damping * 0.4f;
+        float feedback = 0.7f + roomSize * 0.28f;
+        float damp = damping * 0.4f;
         float inv_damp = 1f - damp;
         for (int f = 0; f < frames; f++) {
             int i = f * channels;
@@ -87,8 +86,8 @@ public sealed class Reverb : MonoEffect {
                 _ap_pos[a]++;
                 if (_ap_pos[a] >= _ap_l[a].Length) _ap_pos[a] = 0;
             }
-            buffer[i] = in_l * (1f - Mix) + out_l * Mix;
-            if (channels >= 2) buffer[i + 1] = in_r * (1f - Mix) + out_r * Mix;
+            buffer[i] = in_l * (1f - mix) + out_l * mix;
+            if (channels >= 2) buffer[i + 1] = in_r * (1f - mix) + out_r * mix;
         }
         ApplyMonoCompatibility(buffer, channels);
     }

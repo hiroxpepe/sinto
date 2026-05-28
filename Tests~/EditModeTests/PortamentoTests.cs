@@ -12,7 +12,7 @@ public class PortamentoTests
     [Test] public void Initial_IsGliding_IsFalse()
     {
         var p = new Portamento();
-        Assert.That(p.IsGliding, Is.False);
+        Assert.That(p.isGliding, Is.False);
     }
 
     [Test] public void SnapToTarget_InstantFrequencyChange()
@@ -20,8 +20,8 @@ public class PortamentoTests
         var p = new Portamento();
         p.SetTarget(440f, 0f, SR);
         p.SnapToTarget();
-        Assert.That(p.CurrentFrequency, Is.EqualTo(440f).Within(0.01f));
-        Assert.That(p.IsGliding, Is.False);
+        Assert.That(p.currentFrequency, Is.EqualTo(440f).Within(0.01f));
+        Assert.That(p.isGliding, Is.False);
     }
 
     [Test] public void SetTarget_ZeroTime_SnapImmediate()
@@ -39,7 +39,7 @@ public class PortamentoTests
         p.SnapToTarget(); // start at 220Hz
         p.SetTarget(440f, 1.0f, SR); // glide to 440Hz over 1 second
 
-        Assert.That(p.IsGliding, Is.True);
+        Assert.That(p.isGliding, Is.True);
 
         // After first tick, frequency must be between 220 and 440
         float first = p.Tick();
@@ -59,8 +59,8 @@ public class PortamentoTests
 
         Assert.That(last, Is.EqualTo(440f).Within(1.0f),
             "Portamento must reach target frequency after glide time.");
-        Assert.That(p.IsGliding, Is.False,
-            "IsGliding must be false after reaching target.");
+        Assert.That(p.isGliding, Is.False,
+            "isGliding must be false after reaching target.");
     }
 
     [Test] public void Tick_OutputIsAlwaysPositive()

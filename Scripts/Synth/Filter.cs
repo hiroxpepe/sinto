@@ -12,21 +12,20 @@ public enum FilterKind : byte { Roland = 0, Moog = 1 }
 /// <summary>Filter: Moog 4-pole ladder + Roland one-pole. Denormal-safe, cached coefficients.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public struct Filter {
-#nullable enable
-    private const float TWO_PI = 6.28318530717958f;
-    private const float LN1000 = 6.90775527898214f; // ln(1000) for exp() instead of pow()
+    const float TWO_PI = 6.28318530717958f;
+    const float LN1000 = 6.90775527898214f; // ln(1000) for exp() instead of pow()
 
     // State variables
-    private float _s1, _s2, _s3, _s4;
-    private float _k;          // resonance feedback (internal, ×4.5 scaled)
-    private float _cutoff_g;   // cutoff frequency coefficient
-    private FilterKind _mode;
+    float _s1, _s2, _s3, _s4;
+    float _k;          // resonance feedback (internal, ×4.5 scaled)
+    float _cutoff_g;   // cutoff frequency coefficient
+    FilterKind _mode;
     // Cache for cheap SetParams: avoid recomputing MathF.Exp every sample
-    private float _cached_cutoff;
-    private float _cached_resonance;
-    private int   _cached_sr;
-    private FilterKind _cached_mode;
-    private bool  _cache_valid;
+    float _cached_cutoff;
+    float _cached_resonance;
+    int   _cached_sr;
+    FilterKind _cached_mode;
+    bool  _cache_valid;
 
     public void SetParams(float cutoff, float resonance,
         FilterKind mode, int sampleRate) {
@@ -99,7 +98,7 @@ public struct Filter {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private float ProcessMoog(float input) {
+    float ProcessMoog(float input) {
         // Moog 4-pole linear ladder. Self-oscillation at k=4.0+.
         float u = input - _k * _s4;
         _s1 += _cutoff_g * (u  - _s1);
@@ -113,7 +112,7 @@ public struct Filter {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private float ProcessRoland(float input) {
+    float ProcessRoland(float input) {
         // IR3109-style: 4-pole ladder with feedback from stage 4,
         // output tapped from stage 2 (-12dB/oct slope, Juno-106 character).
         // Feedback from _s4 (full ladder) allows self-oscillation same as Moog.

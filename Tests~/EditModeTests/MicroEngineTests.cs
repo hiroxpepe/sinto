@@ -16,7 +16,7 @@ public class MicroEngineTests
     [Test] public void IsActive_Initially_IsFalse()
     {
         var m = new MicroEngine(44100);
-        Assert.That(m.IsActive, Is.False);
+        Assert.That(m.isActive, Is.False);
     }
 
     [Test] public void RenderMono_Stereo_DuplicatesLandR()

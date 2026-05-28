@@ -15,14 +15,14 @@ public class EngineTests
     [Test] public void IsPaused_InitiallyFalse()
     {
         using var e = new Engine();
-        Assert.That(e.IsPaused, Is.False);
+        Assert.That(e.isPaused, Is.False);
     }
 
     [Test] public void Pause_SetsPausedTrue()
     {
         using var e = new Engine();
         e.Pause();
-        Assert.That(e.IsPaused, Is.True);
+        Assert.That(e.isPaused, Is.True);
     }
 
     [Test] public void Resume_SetsPausedFalse()
@@ -30,7 +30,7 @@ public class EngineTests
         using var e = new Engine();
         e.Pause();
         e.Resume();
-        Assert.That(e.IsPaused, Is.False);
+        Assert.That(e.isPaused, Is.False);
     }
 
     [Test] public void ProcessAudioCallback_WhilePaused_ZeroesBuffer()
@@ -66,13 +66,13 @@ public class EngineTests
     {
         using var e = new Engine();
         e.SetBPM(140f);
-        Assert.That(e.CurrentBpm, Is.EqualTo(140f).Within(0.1f));
+        Assert.That(e.currentBpm, Is.EqualTo(140f).Within(0.1f));
     }
 
     [Test] public void ActiveVoices_Initially_IsZero()
     {
         using var e = new Engine();
-        Assert.That(e.ActiveVoices, Is.EqualTo(0));
+        Assert.That(e.activeVoices, Is.EqualTo(0));
     }
 
     [Test] public void DefaultEvent_KindIsNone()
@@ -86,14 +86,14 @@ public class EngineTests
 
     [Test] public void ProcessAudioCallback_NoneEvent_IsIgnoredSafely()
     {
-        // Verify that processing a buffer with no events keeps ActiveVoices = 0.
+        // Verify that processing a buffer with no events keeps activeVoices = 0.
         // The None event defense is: (1) default(Event).Kind == None proven above,
         // (2) ApplyEvent must have a case/default that discards None without triggering NoteOn.
         using var e = new Engine();
         var buf = new float[512];
         // Process empty buffer (ring buffer has no events = effectively None events)
         e.ProcessAudioCallback(buf.AsSpan());
-        Assert.That(e.ActiveVoices, Is.EqualTo(0),
+        Assert.That(e.activeVoices, Is.EqualTo(0),
             "Processing empty buffer must not trigger phantom NoteOn.");
     }
 
@@ -139,38 +139,38 @@ public class EngineTests
         var buf = new float[512];
         for (int i = 0; i < 1000; i++)
             e.ProcessAudioCallback(buf.AsSpan());
-        Assert.That(e.ActiveVoices, Is.EqualTo(0),
+        Assert.That(e.activeVoices, Is.EqualTo(0),
             "1000 empty ProcessAudioCallback calls must not trigger any phantom NoteOn.");
     }
 
     [Test] public void Pause_Resume_TickDoesNotAccumulate()
     {
         // DoesNotThrow alone does not prove DspTime is not accumulating.
-        // Numerically verify DspTimeSamples does not advance while paused.
+        // Numerically verify dspTimeSamples does not advance while paused.
         using var e = new Engine();
         var buf = new float[512];
 
         // Process one buffer to establish DspTime baseline
         e.ProcessAudioCallback(buf.AsSpan());
-        long beforePause = e.DspTimeSamples;
+        long beforePause = e.dspTimeSamples;
 
         // Pause and call ProcessAudioCallback 100 times
         e.Pause();
         for (int i = 0; i < 100; i++) e.ProcessAudioCallback(buf.AsSpan());
-        long duringPause = e.DspTimeSamples;
+        long duringPause = e.dspTimeSamples;
 
-        // DspTimeSamples must NOT advance while paused
+        // dspTimeSamples must NOT advance while paused
         Assert.That(duringPause, Is.EqualTo(beforePause),
-            "DspTimeSamples must NOT advance while paused.");
+            "dspTimeSamples must NOT advance while paused.");
 
         // Resume and process exactly one buffer
         e.Resume();
         e.ProcessAudioCallback(buf.AsSpan());
-        long afterResume = e.DspTimeSamples;
+        long afterResume = e.dspTimeSamples;
 
         // After Resume, DspTime must advance by exactly one buffer (no burst accumulation)
         Assert.That(afterResume, Is.EqualTo(beforePause + 512),
-            "DspTimeSamples must advance by exactly 1 buffer after Resume.");
+            "dspTimeSamples must advance by exactly 1 buffer after Resume.");
     }
 
     // ── SetOscParams ─────────────────────────────────────────────────────

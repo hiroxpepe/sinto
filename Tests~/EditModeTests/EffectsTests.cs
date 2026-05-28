@@ -18,7 +18,7 @@ public class ChorusTests
     [Test] public void Process_SilentInput_ProducesSilentOrNearSilentOutput()
     {
         var c = new Chorus(44100);
-        c.Mix = 1.0f; c.Enabled = true;
+        c.mix = 1.0f; c.enabled = true;
         var buf = new float[1024];
         c.Process(buf.AsSpan(), 2);
         foreach (float s in buf)
@@ -28,7 +28,7 @@ public class ChorusTests
     [Test] public void Process_OutputIsFinite()
     {
         var c = new Chorus(44100);
-        c.Mix = 0.5f; c.Enabled = true;
+        c.mix = 0.5f; c.enabled = true;
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.1f) * 0.5f;
         c.Process(buf.AsSpan(), 2);
@@ -40,8 +40,8 @@ public class ChorusTests
     {
         var c1 = new Chorus(44100);
         var c2 = new Chorus(44100);
-        c1.Mix = 1.0f; c1.Enabled = true;
-        c2.Mix = 1.0f; c2.Enabled = true;
+        c1.mix = 1.0f; c1.enabled = true;
+        c2.mix = 1.0f; c2.enabled = true;
         var buf1 = new float[512];
         var buf2 = new float[512];
         for (int i = 0; i < 512; i++) buf1[i] = 0.5f;
@@ -55,7 +55,7 @@ public class ChorusTests
     [Test] public void Reset_ClearsBuffer()
     {
         var c = new Chorus(44100);
-        c.Mix = 1.0f; c.Enabled = true;
+        c.mix = 1.0f; c.enabled = true;
         var fillBuf = new float[1024];
         for (int i = 0; i < fillBuf.Length; i++) fillBuf[i] = 0.8f;
         c.Process(fillBuf.AsSpan(), 2);
@@ -77,7 +77,7 @@ public class ReverbTests
     [Test] public void Process_SilentInput_ProducesSilentOutput()
     {
         var r = new Reverb();
-        r.Mix = 1.0f; r.Enabled = true;
+        r.mix = 1.0f; r.enabled = true;
         var buf = new float[1024];
         r.Process(buf.AsSpan(), 2);
         foreach (float s in buf)
@@ -87,7 +87,7 @@ public class ReverbTests
     [Test] public void Process_OutputIsFinite()
     {
         var r = new Reverb();
-        r.RoomSize = 0.9f; r.Damping = 0.5f; r.Mix = 0.5f; r.Enabled = true;
+        r.roomSize = 0.9f; r.damping = 0.5f; r.mix = 0.5f; r.enabled = true;
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.05f) * 0.3f;
         r.Process(buf.AsSpan(), 2);
@@ -98,7 +98,7 @@ public class ReverbTests
     [Test] public void Reset_DoesNotContinueReverbTail()
     {
         var r = new Reverb();
-        r.RoomSize = 0.9f; r.Mix = 1.0f; r.Enabled = true;
+        r.roomSize = 0.9f; r.mix = 1.0f; r.enabled = true;
         var fillBuf = new float[44100];
         for (int i = 0; i < fillBuf.Length; i++) fillBuf[i] = 0.5f;
         r.Process(fillBuf.AsSpan(), 2);
@@ -137,8 +137,8 @@ public class EffectsTests
     [Test] public void Retro_PS1Mode_SampleHold_MaintainsBufferLength_Mono()
     {
         var ec = new Sinto.Core.Effects.Effects(44100);
-        ec.Retro.Mode    = Sinto.Core.Synth.RetroMode.PS1;
-        ec.Retro.Enabled = true;
+        ec.Retro.mode    = Sinto.Core.Synth.RetroMode.PS1;
+        ec.Retro.enabled = true;
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.1f);
         ec.Process(buf.AsSpan(), 1);
@@ -156,8 +156,8 @@ public class EffectsTests
         const int Channels = 2;
         const int Frames   = 1024;
         var ec = new Sinto.Core.Effects.Effects(44100);
-        ec.Retro.Mode    = Sinto.Core.Synth.RetroMode.PS1;
-        ec.Retro.Enabled = true;
+        ec.Retro.mode    = Sinto.Core.Synth.RetroMode.PS1;
+        ec.Retro.enabled = true;
         var buf = new float[Frames * Channels];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.07f) * 0.5f;
         ec.Process(buf.AsSpan(), Channels);

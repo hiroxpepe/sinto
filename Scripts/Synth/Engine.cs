@@ -10,26 +10,25 @@ namespace Sinto.Core.Synth;
 /// <summary>Main synthesizer engine. Lock-free SPSC event queue + voice manager.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Engine : IDisposable {
-#nullable enable
-    private readonly RingBuffer<Event> _event_queue;
-    private readonly Voices            _voices;
-    private readonly Scaler            _scaler;
-    private readonly int               _sample_rate;
-    private readonly int               _channels;
-    private int   _paused;
-    private float _current_bpm;
-    private long  _dsp_time_samples;
-    private WaveType _current_wave  = WaveType.Saw;
-    private float    _osc1_level     = 1.0f;
-    private float    _osc2_level     = 0.5f;
-    private float    _detune_cents   = 0f;
-    private EnvParams _current_amp_env = EnvParams.Default;
+    readonly RingBuffer<Event> _event_queue;
+    readonly Voices            _voices;
+    readonly Scaler            _scaler;
+    readonly int               _sample_rate;
+    readonly int               _channels;
+    int   _paused;
+    float _current_bpm;
+    long  _dsp_time_samples;
+    WaveType _current_wave  = WaveType.Saw;
+    float    _osc1_level     = 1.0f;
+    float    _osc2_level     = 0.5f;
+    float    _detune_cents   = 0f;
+    EnvParams _current_amp_env = EnvParams.Default;
 
-    public int   ActiveVoices     => _voices.ActiveVoices;
-    public int   CurrentMaxVoices => _scaler.CurrentMaxVoices;
-    public bool  IsPaused         => Volatile.Read(ref _paused) != 0;
-    public float CurrentBpm       => _current_bpm;
-    public long  DspTimeSamples   => Volatile.Read(ref _dsp_time_samples);
+    public int   activeVoices     => _voices.activeVoices;
+    public int   currentMaxVoices => _scaler.currentMaxVoices;
+    public bool  isPaused         => Volatile.Read(ref _paused) != 0;
+    public float currentBpm       => _current_bpm;
+    public long  dspTimeSamples   => Volatile.Read(ref _dsp_time_samples);
 
     public Engine(int sampleRate = 44100, int channels = 2,
         int maxVoices = 32, int bufferSize = 1024) {
@@ -90,7 +89,7 @@ public sealed class Engine : IDisposable {
         => _current_amp_env = new EnvParams(attack, decay, sustain, release);
 
     public void Pause() {
-        // Set _paused immediately for IsPaused check
+        // Set _paused immediately for isPaused check
         Volatile.Write(ref _paused, 1);
     }
     public void Resume() {
@@ -131,7 +130,7 @@ public sealed class Engine : IDisposable {
         _scaler.OnCallbackEnd(frames, _sample_rate);
     }
 
-    private void RenderRange(Span<float> sub) {
+    void RenderRange(Span<float> sub) {
         if (Volatile.Read(ref _paused) != 0) {
             sub.Clear();
             // DspTime does NOT advance while paused
@@ -141,7 +140,7 @@ public sealed class Engine : IDisposable {
         Interlocked.Add(ref _dsp_time_samples, sub.Length);
     }
 
-    private void ApplyEvent(in Event ev) {
+    void ApplyEvent(in Event ev) {
         switch (ev.Kind) {
             case EventKind.None:
                 return; // explicit no-op, prevent phantom NoteOn

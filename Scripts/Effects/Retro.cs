@@ -10,16 +10,16 @@ namespace Sinto.Core.Effects;
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Retro : IEffect {
 #nullable enable
-    public RetroMode Mode    { get; set; } = RetroMode.Clean;
-    public bool      Enabled { get; set; }
+    public RetroMode mode    { get; set; } = RetroMode.Clean;
+    public bool      enabled { get; set; }
 
-    private float _hold_l, _hold_r;
-    private int _frame_counter;
+    float _hold_l, _hold_r;
+    int _frame_counter;
 
     public void Process(Span<float> buffer, int channels) {
-        if (!Enabled || Mode == RetroMode.Clean) return;
+        if (!enabled || mode == RetroMode.Clean) return;
         if (channels < 1) channels = 1;
-        int hold_frames = Mode switch {
+        int hold_frames = mode switch {
             RetroMode.N64 => 2,   // 44100 → 22050
             RetroMode.PS1 => 4,   // 44100 → 11025
             _ => 1,
@@ -46,6 +46,6 @@ public sealed class Retro : IEffect {
         _frame_counter = 0;
     }
 
-    private static float AdpcmWaveshape(float x)
+    static float AdpcmWaveshape(float x)
         => MathF.Round(x * 16f) / 16f * 0.7f + x * 0.3f;
 }

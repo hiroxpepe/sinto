@@ -9,12 +9,11 @@ namespace Sinto.Core.Effects;
 /// <summary>Serial effects chain: Chorus → Reverb → Delay → Retro → SoftClip.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Effects {
-#nullable enable
     public Chorus Chorus { get; }
     public Reverb Reverb { get; }
     public Delay  Delay  { get; }
     public Retro  Retro  { get; }
-    public bool   MonoCompatible { get; set; }
+    public bool   monoCompatible { get; set; }
 
     public Effects(int sampleRate = 44100) {
         if (sampleRate <= 0) sampleRate = 44100;
@@ -25,12 +24,12 @@ public sealed class Effects {
     }
 
     public void Process(Span<float> buffer, int channels) {
-        Chorus.MonoCompatible = MonoCompatible;
-        Reverb.MonoCompatible = MonoCompatible;
-        if (Chorus.Enabled) Chorus.Process(buffer, channels);
-        if (Reverb.Enabled) Reverb.Process(buffer, channels);
-        if (Delay.Enabled)  Delay.Process(buffer, channels);
-        if (Retro.Enabled)  Retro.Process(buffer, channels);
+        Chorus.monoCompatible = monoCompatible;
+        Reverb.monoCompatible = monoCompatible;
+        if (Chorus.enabled) Chorus.Process(buffer, channels);
+        if (Reverb.enabled) Reverb.Process(buffer, channels);
+        if (Delay.enabled)  Delay.Process(buffer, channels);
+        if (Retro.enabled)  Retro.Process(buffer, channels);
         ApplySoftClip(buffer);
     }
 

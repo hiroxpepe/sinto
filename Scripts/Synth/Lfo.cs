@@ -9,16 +9,15 @@ namespace Sinto.Core.Synth;
 /// <summary>LFO state: Sine/Triangle/Square/S&H + tempo sync.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public struct Lfo {
-#nullable enable
-    private const double TWO_PI = 6.283185307179586;
-    private const double INV_PI = 0.3183098861837907;
+    const double TWO_PI = 6.283185307179586;
+    const double INV_PI = 0.3183098861837907;
 
-    private double _phase;
-    private double _phase_inc;
-    private float  _sh_value;
-    private double _sh_prev_phase;
-    private float  _current_bpm;
-    private uint   _noise_seed;
+    double _phase;
+    double _phase_inc;
+    float  _sh_value;
+    double _sh_prev_phase;
+    float  _current_bpm;
+    uint   _noise_seed;
 
     public void Initialize(in LfoParams p, int sampleRate, float bpm = 120f) {
         Calc.Initialize();

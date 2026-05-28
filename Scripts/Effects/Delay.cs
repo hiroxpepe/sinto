@@ -9,22 +9,22 @@ namespace Sinto.Core.Effects;
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Delay : IEffect {
 #nullable enable
-    private readonly float[] _delay_buf_l;
-    private readonly float[] _delay_buf_r;
-    private int   _write_pos;
-    private float _read_pos_l;
-    private float _read_pos_r;
-    private float _target_time_sec;
-    private readonly int _sample_rate;
-    private readonly int _max_samples;
+    readonly float[] _delay_buf_l;
+    readonly float[] _delay_buf_r;
+    int   _write_pos;
+    float _read_pos_l;
+    float _read_pos_r;
+    float _target_time_sec;
+    readonly int _sample_rate;
+    readonly int _max_samples;
 
-    public float Time      { get; set; } = 0.25f;
-    public float Feedback  { get; set; } = 0.3f;
-    public float Mix       { get; set; } = 0.3f;
-    public bool  TempoSync { get; set; }
-    public float Bpm       { get; set; } = 120f;
-    public float SyncNote  { get; set; } = 0.25f;
-    public bool  Enabled   { get; set; }
+    public float time      { get; set; } = 0.25f;
+    public float feedback  { get; set; } = 0.3f;
+    public float mix       { get; set; } = 0.3f;
+    public bool  tempoSync { get; set; }
+    public float bpm       { get; set; } = 120f;
+    public float syncNote  { get; set; } = 0.25f;
+    public bool  enabled   { get; set; }
 
     public Delay(int sampleRate = 44100) {
         if (sampleRate <= 0) sampleRate = 44100;
@@ -35,18 +35,18 @@ public sealed class Delay : IEffect {
         _write_pos = 0;
         _read_pos_l = 0f;
         _read_pos_r = 0f;
-        _target_time_sec = Time;
+        _target_time_sec = time;
     }
 
     public void Process(Span<float> buffer, int channels) {
-        if (!Enabled || Mix <= 0f) return;
+        if (!enabled || mix <= 0f) return;
         if (channels < 1) channels = 1;
         // Clamp feedback to prevent runaway
-        float fb = Feedback;
+        float fb = feedback;
         if      (fb < 0f)    fb = 0f;
         else if (fb > 0.95f) fb = 0.95f;
         // Target sample delay (fractional)
-        float target_samples = Time * _sample_rate;
+        float target_samples = time * _sample_rate;
         if (target_samples < 1f)              target_samples = 1f;
         if (target_samples > _max_samples - 4) target_samples = _max_samples - 4;
         // Smooth read pointer towards target (fractional delay — prevents click)
@@ -81,10 +81,10 @@ public sealed class Delay : IEffect {
             _delay_buf_l[_write_pos] = in_l + delayed_l * fb;
             _delay_buf_r[_write_pos] = in_r + delayed_r * fb;
             _write_pos = (_write_pos + 1) % _max_samples;
-            // Mix
-            buffer[i] = in_l * (1f - Mix) + delayed_l * Mix;
+            // mix
+            buffer[i] = in_l * (1f - mix) + delayed_l * mix;
             if (channels >= 2)
-                buffer[i + 1] = in_r * (1f - Mix) + delayed_r * Mix;
+                buffer[i + 1] = in_r * (1f - mix) + delayed_r * mix;
         }
     }
 
@@ -97,9 +97,9 @@ public sealed class Delay : IEffect {
     }
 
     public void SetBPM(float bpm) {
-        Bpm = bpm;
-        if (TempoSync) {
-            Time = 60f / bpm * SyncNote * 4f;
+        this.bpm = bpm;
+        if (tempoSync) {
+            time = 60f / bpm * syncNote * 4f;
         }
     }
 }

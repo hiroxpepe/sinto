@@ -8,24 +8,23 @@ namespace Sinto.Core.Synth;
 /// <summary>Dynamic voice scaler. Tier-based reduction under load.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Scaler {
-#nullable enable
-    private static readonly int[] TIERS = { 32, 24, 16 };
-    private const float DOWN_THRESHOLD                 = 0.70f;
-    private const int   CONSECUTIVE_OVERLOAD_REQUIRED  = 3;
-    private const float UP_THRESHOLD                   = 0.40f;
-    private const int   COOLDOWN_CALLBACKS             = 64;
-    private const int   HEADROOM_CALLBACKS             = 300;
+    static readonly int[] TIERS = { 32, 24, 16 };
+    const float DOWN_THRESHOLD                 = 0.70f;
+    const int   CONSECUTIVE_OVERLOAD_REQUIRED  = 3;
+    const float UP_THRESHOLD                   = 0.40f;
+    const int   COOLDOWN_CALLBACKS             = 64;
+    const int   HEADROOM_CALLBACKS             = 300;
 
-    private readonly Voices _voices;
-    private readonly ITimer _time;
-    private int  _current_tier_index;
-    private int  _cooldown_remaining;
-    private int  _consecutive_overload;
-    private int  _consecutive_headroom;
-    private long _callback_start_tick;
+    readonly Voices _voices;
+    readonly ITimer _time;
+    int  _current_tier_index;
+    int  _cooldown_remaining;
+    int  _consecutive_overload;
+    int  _consecutive_headroom;
+    long _callback_start_tick;
 
-    public int CurrentMaxVoices => TIERS[_current_tier_index];
-    public int CurrentTierIndex => _current_tier_index;
+    public int currentMaxVoices => TIERS[_current_tier_index];
+    public int currentTierIndex => _current_tier_index;
 
     public Scaler(Voices voices, ITimer? timeProvider = null) {
         _voices = voices ?? throw new System.ArgumentNullException(nameof(voices));
@@ -50,7 +49,7 @@ public sealed class Scaler {
             return;
         }
         long elapsed_ticks = _time.GetTimestamp() - _callback_start_tick;
-        double elapsed_sec = (double)elapsed_ticks / _time.Frequency;
+        double elapsed_sec = (double)elapsed_ticks / _time.frequency;
         double buffer_duration = (double)bufferLength / sampleRate;
         double usage = elapsed_sec / buffer_duration;
         if (usage >= DOWN_THRESHOLD) {

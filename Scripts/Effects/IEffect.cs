@@ -5,9 +5,11 @@ using System;
 
 namespace Sinto.Core.Effects;
 
+/// <summary>Shared processing contract for audio effects.</summary>
+/// <author>h.adachi (STUDIO MeowToon)</author>
 public interface IEffect
 {
     void Process(Span<float> buffer, int channels);
     void Reset();
-    bool Enabled { get; set; }
+    bool enabled { get; set; }
 }

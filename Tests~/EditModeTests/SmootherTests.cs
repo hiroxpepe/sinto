@@ -10,13 +10,13 @@ public class SmootherTests
     [Test] public void Constructor_SetsCurrentToInitialValue()
     {
         var sp = new Smoother(0.5f);
-        Assert.That(sp.Current, Is.EqualTo(0.5f).Within(1e-6f));
+        Assert.That(sp.current, Is.EqualTo(0.5f).Within(1e-6f));
     }
 
     [Test] public void Constructor_SetsTargetToInitialValue()
     {
         var sp = new Smoother(0.3f);
-        Assert.That(sp.Target, Is.EqualTo(0.3f).Within(1e-6f));
+        Assert.That(sp.target, Is.EqualTo(0.3f).Within(1e-6f));
     }
 
     [Test] public void SnapToTarget_SetsCurrentToTarget()
@@ -24,30 +24,30 @@ public class SmootherTests
         var sp = new Smoother(0.0f);
         sp.SetTarget(0.9f);
         sp.SnapToTarget();
-        Assert.That(sp.Current, Is.EqualTo(0.9f).Within(1e-6f));
+        Assert.That(sp.current, Is.EqualTo(0.9f).Within(1e-6f));
     }
 
     [Test] public void Tick_ApproachesTarget()
     {
         var sp = new Smoother(0.0f);
         sp.SetTarget(1.0f);
-        float prev = sp.Current;
+        float prev = sp.current;
         sp.Tick();
-        Assert.That(sp.Current, Is.GreaterThan(prev));
+        Assert.That(sp.current, Is.GreaterThan(prev));
     }
 
     [Test] public void Tick_NeverOvershoots_AndApproachesTarget()
     {
         // One-pole lowpass asymptotically approaches target: verify both non-overshoot and convergence.
-        // LessThanOrEqualTo alone would pass even if Current stays at 0.0 (false negative).
+        // LessThanOrEqualTo alone would pass even if current stays at 0.0 (false negative).
         var sp = new Smoother(0.0f, smoothingHz: 20f, sampleRate: 44100);
         sp.SetTarget(1.0f);
         for (int i = 0; i < 10000; i++) sp.Tick(); // ~226ms @ 44100Hz >> 8ms response time
         // Must not overshoot
-        Assert.That(sp.Current, Is.LessThanOrEqualTo(1.0f + 1e-6f),
+        Assert.That(sp.current, Is.LessThanOrEqualTo(1.0f + 1e-6f),
             "Smoother must not overshoot target.");
         // Must be close enough to target (10000 samples ≈ 226ms should reach 99.9%+)
-        Assert.That(sp.Current, Is.GreaterThanOrEqualTo(1.0f - 1e-3f),
+        Assert.That(sp.current, Is.GreaterThanOrEqualTo(1.0f - 1e-3f),
             "Smoother must have converged to within 0.1% of target after 226ms.");
     }
 
@@ -67,7 +67,7 @@ public class SmootherTests
         sp.SetTarget(0.9f);
         sp.SnapToTarget(); // Always call on NoteOn
         // First sample must be 0.9 (no glide from 0.1)
-        Assert.That(sp.Current, Is.EqualTo(0.9f).Within(1e-6f));
+        Assert.That(sp.current, Is.EqualTo(0.9f).Within(1e-6f));
     }
 
     [Test] public void Constructor_ZeroSampleRate_ThrowsArgumentException()
@@ -78,7 +78,7 @@ public class SmootherTests
     [TestCase(-100f)]
     public void Constructor_ZeroOrNegativeSmoothingHz_ThrowsArgumentOutOfRangeException(float hz)
     {
-        // smoothingHz=0 → coeff=0 → Current never moves → parameter frozen forever.
+        // smoothingHz=0 → coeff=0 → current never moves → parameter frozen forever.
         // Must throw to catch misconfiguration early.
         Assert.Throws<System.ArgumentOutOfRangeException>(
             () => new Smoother(0f, hz, 44100),

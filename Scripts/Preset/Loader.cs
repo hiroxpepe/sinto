@@ -11,8 +11,7 @@ namespace Sinto.Core.Preset;
 /// <summary>Load .sinto JSON preset files. Returns Default on any error.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public static class Loader {
-#nullable enable
-    private static readonly JsonSerializerOptions OPTIONS = new() {
+    static readonly JsonSerializerOptions OPTIONS = new() {
         PropertyNameCaseInsensitive = true,
         IncludeFields = true,
     };
@@ -39,7 +38,7 @@ public static class Loader {
         }
     }
 
-    private static byte[] Deobfuscate(byte[] data) {
+    static byte[] Deobfuscate(byte[] data) {
         const byte KEY_BASE = 0x5A;
         byte[] result = new byte[data.Length];
         for (int i = 0; i < data.Length; i++) {

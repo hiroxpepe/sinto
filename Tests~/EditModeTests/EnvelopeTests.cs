@@ -12,39 +12,39 @@ public class EnvelopeTests
     [Test] public void Initial_PhaseIsFree()
     {
         var e = new Envelope();
-        Assert.That(e.Phase, Is.EqualTo(PlayState.Free));
+        Assert.That(e.phase, Is.EqualTo(PlayState.Free));
     }
 
     [Test] public void NoteOn_PhaseBecomesAttack()
     {
         var e = new Envelope();
         e.NoteOn(EnvParams.Default, SR);
-        Assert.That(e.Phase, Is.EqualTo(PlayState.Attack));
+        Assert.That(e.phase, Is.EqualTo(PlayState.Attack));
     }
 
     [Test] public void Attack_LevelIncreasesEachTick()
     {
         var e = new Envelope();
         e.NoteOn(new EnvParams(1.0f, 0.1f, 0.8f, 0.2f), SR);
-        float prev = e.Level;
+        float prev = e.level;
         e.Tick();
-        Assert.That(e.Level, Is.GreaterThan(prev));
+        Assert.That(e.level, Is.GreaterThan(prev));
     }
 
     [Test] public void Attack_ReachesDecayPhase()
     {
         var e = new Envelope();
         e.NoteOn(new EnvParams(0.001f, 0.1f, 0.8f, 0.2f), SR);
-        for (int i = 0; i < SR; i++) { e.Tick(); if (e.Phase == PlayState.Decay) break; }
-        Assert.That(e.Phase, Is.EqualTo(PlayState.Decay));
+        for (int i = 0; i < SR; i++) { e.Tick(); if (e.phase == PlayState.Decay) break; }
+        Assert.That(e.phase, Is.EqualTo(PlayState.Decay));
     }
 
     [Test] public void Decay_ReachesSustainPhase()
     {
         var e = new Envelope();
         e.NoteOn(new EnvParams(0.001f, 0.001f, 0.5f, 0.2f), SR);
-        for (int i = 0; i < SR * 2; i++) { e.Tick(); if (e.Phase == PlayState.Sustain) break; }
-        Assert.That(e.Phase, Is.EqualTo(PlayState.Sustain));
+        for (int i = 0; i < SR * 2; i++) { e.Tick(); if (e.phase == PlayState.Sustain) break; }
+        Assert.That(e.phase, Is.EqualTo(PlayState.Sustain));
     }
 
     [Test] public void NoteOff_TransitionsToRelease()
@@ -53,7 +53,7 @@ public class EnvelopeTests
         e.NoteOn(EnvParams.Default, SR);
         for (int i = 0; i < SR / 10; i++) e.Tick();
         e.NoteOff();
-        Assert.That(e.Phase, Is.EqualTo(PlayState.Release));
+        Assert.That(e.phase, Is.EqualTo(PlayState.Release));
     }
 
     [Test] public void Release_IsDoneWhenLevelReachesZero()
@@ -62,8 +62,8 @@ public class EnvelopeTests
         e.NoteOn(new EnvParams(0.001f, 0.001f, 0.0f, 0.001f), SR);
         for (int i = 0; i < SR; i++) e.Tick();
         e.NoteOff();
-        for (int i = 0; i < SR; i++) { e.Tick(); if (e.IsDone) break; }
-        Assert.That(e.IsDone, Is.True);
+        for (int i = 0; i < SR; i++) { e.Tick(); if (e.isDone) break; }
+        Assert.That(e.isDone, Is.True);
     }
 
     [Test] public void QuickRelease_PhaseBecomesQuickRelease()
@@ -72,7 +72,7 @@ public class EnvelopeTests
         e.NoteOn(EnvParams.Default, SR);
         for (int i = 0; i < 100; i++) e.Tick();
         e.StartQuickRelease(SR);
-        Assert.That(e.Phase, Is.EqualTo(PlayState.QuickRelease));
+        Assert.That(e.phase, Is.EqualTo(PlayState.QuickRelease));
     }
 
     [Test] public void QuickRelease_CompletesWithin220Samples()
@@ -81,8 +81,8 @@ public class EnvelopeTests
         e.NoteOn(new EnvParams(0.001f, 0.001f, 1.0f, 0.001f), SR);
         for (int i = 0; i < 200; i++) e.Tick(); // sustain phase
         e.StartQuickRelease(SR);
-        for (int i = 0; i < 220; i++) { e.Tick(); if (e.IsDone) break; }
-        Assert.That(e.IsDone, Is.True);
+        for (int i = 0; i < 220; i++) { e.Tick(); if (e.isDone) break; }
+        Assert.That(e.isDone, Is.True);
     }
 
     [Test] public void NoteOff_DuringAttack_TransitionsToRelease()
@@ -91,15 +91,15 @@ public class EnvelopeTests
         e.NoteOn(new EnvParams(10.0f, 0.1f, 0.8f, 0.2f), SR); // long attack
         for (int i = 0; i < 10; i++) e.Tick();
         e.NoteOff();
-        Assert.That(e.Phase, Is.EqualTo(PlayState.Release));
+        Assert.That(e.phase, Is.EqualTo(PlayState.Release));
     }
 
     [Test] public void SustainZero_DecayReachesZero()
     {
         var e = new Envelope();
         e.NoteOn(new EnvParams(0.001f, 0.001f, 0.0f, 0.001f), SR);
-        for (int i = 0; i < SR; i++) { e.Tick(); if (e.Phase == PlayState.Sustain) break; }
-        Assert.That(e.Level, Is.EqualTo(0f).Within(1e-4f));
+        for (int i = 0; i < SR; i++) { e.Tick(); if (e.phase == PlayState.Sustain) break; }
+        Assert.That(e.level, Is.EqualTo(0f).Within(1e-4f));
     }
 
     [Test] public void NoteOn_DefaultEnvParams_DoesNotProduceNaN()
@@ -128,13 +128,13 @@ public class EnvelopeTests
         Assert.That(float.IsNaN(first), Is.False, "Zero attack must not produce NaN.");
         Assert.That(float.IsInfinity(first), Is.False, "Zero attack must not produce Infinity.");
 
-        // Level must be at or near 1.0 immediately (bypassed attack phase)
-        Assert.That(e.Level, Is.GreaterThanOrEqualTo(0.9f),
+        // level must be at or near 1.0 immediately (bypassed attack phase)
+        Assert.That(e.level, Is.GreaterThanOrEqualTo(0.9f),
             "Zero attack must produce near-full level immediately. " +
             "Do NOT clamp to 0.001 — that adds an unwanted 1ms click.");
 
-        // Phase must have moved past Attack (Decay or Sustain)
-        Assert.That(e.Phase, Is.Not.EqualTo(PlayState.Attack),
+        // phase must have moved past Attack (Decay or Sustain)
+        Assert.That(e.phase, Is.Not.EqualTo(PlayState.Attack),
             "Zero attack must bypass Attack phase entirely.");
     }
 

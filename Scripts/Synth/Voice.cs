@@ -35,13 +35,13 @@ public struct Voice {
     public float Osc2MasterLevel;
     public float FilterEnvAmount; // 0 = no env modulation on cutoff
     public float PitchEnvAmount;  // 0 = no env modulation on pitch (default)
-    private int  _sample_rate;
-    private long _sample_index;
+    int  _sample_rate;
+    long _sample_index;
     // Frequency cache — only call SetFrequency when freq changes by meaningful amount
-    private float _current_freq1;
-    private float _current_freq2;
+    float _current_freq1;
+    float _current_freq2;
 
-    public float CurrentAmplitude => AmpEnvelope.Level;
+    public float currentAmplitude => AmpEnvelope.level;
 
     public void NoteOn(in Note note, in OscParams osc1p, in OscParams osc2p,
         in EnvParams ampP, in EnvParams filterP, in EnvParams pitchP,
@@ -59,7 +59,7 @@ public struct Voice {
         // Portamento
         Portamento.SetTarget(note.FrequencyHz, portamentoTime, sampleRate);
         if (portamentoTime <= 0f) Portamento.SnapToTarget();
-        float freq = Portamento.CurrentFrequency;
+        float freq = Portamento.currentFrequency;
         if (freq < 1f) freq = note.FrequencyHz;
         float freq2 = freq * Calc.PitchRatioFast(osc2p.DetuneCents / 100f);
         Osc1.SetFrequency(freq, sampleRate);
@@ -99,17 +99,14 @@ public struct Voice {
         in LfoParams lfo1Params, in LfoParams lfo2Params) {
         if (State == PlayState.Free) return 0f;
         int sr = _sample_rate > 0 ? _sample_rate : 44100;
-
         // ── Smoother target update ───────────────────────────────────────
         // Critical: set knob value into Smoother every sample
         // Smoother IIR follows smoothly → no zipper noise
         SmoothedCutoff.SetTarget(filterCutoffBase);
         SmoothedResonance.SetTarget(filterResonanceBase);
-
         // ── Portamento ──────────────────────────────────────────────────
         float freq = Portamento.Tick();
         if (freq < 1f) freq = ActiveNote.FrequencyHz;
-
         // ── Pitch: Envelope and LFO ─────────────────────────────────────
         // PitchEnvelope: always tick, scaled by PitchEnvAmount.
         // PitchEnvAmount=0 (default) = no pitch modulation = no pitch drop on NoteOff
@@ -119,7 +116,6 @@ public struct Voice {
         float lfo2_pitch = (lfo2Params.Destinations & LfoTarget.OSC2Pitch) != 0
                            ? lfo2Output * lfo2Params.Depth * 2f : 0f;
         float total_pitch = pitch_env + lfo1_pitch + lfo2_pitch;
-
         // OSC frequency — only call SetFrequency when ΔHz > 0.05 (skip micro-changes)
         float freq1 = freq * Calc.PitchRatioFast(total_pitch + Osc1Params.DetuneCents / 100f);
         float freq2 = freq * Calc.PitchRatioFast(total_pitch + Osc2Params.DetuneCents / 100f);
@@ -129,7 +125,6 @@ public struct Voice {
         float df2 = freq2 - _current_freq2; if (df2 < 0f) df2 = -df2;
         if (df1 > 0.05f) { Osc1.SetFrequency(freq1, sr); _current_freq1 = freq1; }
         if (df2 > 0.05f) { Osc2.SetFrequency(freq2, sr); _current_freq2 = freq2; }
-
         // ── Oscillators ─────────────────────────────────────────────────
         OscParams p1 = Osc1Params;
         if ((lfo1Params.Destinations & LfoTarget.OSC1PWM) != 0) {
@@ -141,7 +136,6 @@ public struct Voice {
         float o1  = Osc1.Tick(p1) * Osc1MasterLevel;
         float o2  = Osc2.Tick(Osc2Params) * Osc2MasterLevel;
         float mix = (o1 + o2) * 0.5f;
-
         // ── Filter ──────────────────────────────────────────────────────
         float filter_env = FilterEnvelope.Tick();
         // Tick Smoother to get current value (changes smoothly every sample)
@@ -160,14 +154,12 @@ public struct Voice {
         // No threshold gate needed (a gate would cause zipper noise)
         Filter.SetParams(cutoff, resonance, FilterMode, sr);
         float filtered = Filter.Process(mix, _sample_index);
-
         // ── Amp ─────────────────────────────────────────────────────────
         float amp = AmpEnvelope.Tick();
         if ((lfo1Params.Destinations & LfoTarget.Amp) != 0)
             amp *= 1f - lfo1Params.Depth * 0.5f * (1f + lfo1Output);
         if (amp < 0f) amp = 0f;
-        if (AmpEnvelope.IsDone) State = PlayState.Free;
-
+        if (AmpEnvelope.isDone) State = PlayState.Free;
         _sample_index++;
         return filtered * amp * ActiveNote.Velocity;
     }

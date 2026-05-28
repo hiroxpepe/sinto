@@ -8,10 +8,9 @@ namespace Sinto.Core.Audio;
 /// <summary>IIR subnormal protection. No static state — thread-safe.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public static class Denormal {
-#nullable enable
-    private const float MAGNITUDE    = 1e-15f;
-    private const long  CYCLE_LENGTH = 256L;
-    private const float SUBNORMAL_THRESHOLD = 1.175494e-38f; // float.Epsilon * 100
+    const float MAGNITUDE    = 1e-15f;
+    const long  CYCLE_LENGTH = 256L;
+    const float SUBNORMAL_THRESHOLD = 1.175494e-38f; // float.Epsilon * 100
 
     /// <summary>Inject alternating DC offset (~172Hz at 44100Hz) to prevent IIR subnormal trap.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
