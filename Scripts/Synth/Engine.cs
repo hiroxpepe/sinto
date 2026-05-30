@@ -3,9 +3,9 @@
 #nullable enable
 using System;
 using System.Threading;
-using Sinto.Core.Audio;
+using Signo.Core.Audio;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Main synthesizer engine. Lock-free SPSC event queue + voice manager.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

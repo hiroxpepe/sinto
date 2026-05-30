@@ -7,7 +7,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace Sinto.Core.Audio;
+namespace Signo.Core.Audio;
 
 /// <summary>Single-producer single-consumer lock-free ring buffer.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

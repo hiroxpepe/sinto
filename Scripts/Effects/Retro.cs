@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>Retro filter: N64 / PS1 lo-fi degradation via Sample &amp; Hold.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Portamento glide state. Linear frequency interpolation.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

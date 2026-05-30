@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>Base for stereo effects that can be reduced to mono.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

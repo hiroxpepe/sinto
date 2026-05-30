@@ -3,7 +3,7 @@
 #nullable enable
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Dynamic voice scaler. Tier-based reduction under load.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

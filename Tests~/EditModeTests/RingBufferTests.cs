@@ -6,9 +6,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using Sinto.Core.Audio;
+using Signo.Core.Audio;
 
-namespace Sinto.Tests.Audio;
+namespace Signo.Tests.Audio;
 
 [TestFixture]
 public class RingBufferTests

@@ -1,9 +1,9 @@
 #nullable enable
 using System;
 using NUnit.Framework;
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
-namespace Sinto.Tests.Synth;
+namespace Signo.Tests.Synth;
 
 [TestFixture]
 public class CalcTests

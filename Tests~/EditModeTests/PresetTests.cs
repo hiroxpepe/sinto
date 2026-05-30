@@ -4,11 +4,11 @@
 using System;
 using System.IO;
 using NUnit.Framework;
-using Sinto.Core.Preset;
-using Preset = Sinto.Core.Preset.Preset;
-using Sinto.Core.Synth;
+using Signo.Core.Preset;
+using Preset = Signo.Core.Preset.Preset;
+using Signo.Core.Synth;
 
-namespace Sinto.Tests.Preset;
+namespace Signo.Tests.Preset;
 
 // ── Preset ──────────────────────────────────────────────────────────────
 
@@ -17,7 +17,7 @@ public class PresetTests
 {
     [Test] public void Default_HasNonNullSubPresets()
     {
-        var p = Sinto.Core.Preset.Preset.Default;
+        var p = Signo.Core.Preset.Preset.Default;
         Assert.That(p.osc1,           Is.Not.Null);
         Assert.That(p.osc2,           Is.Not.Null);
         Assert.That(p.filter,         Is.Not.Null);
@@ -30,13 +30,13 @@ public class PresetTests
     }
 
     [Test] public void Default_Name_IsNotEmpty()
-        => Assert.That(Sinto.Core.Preset.Preset.Default.name, Is.Not.Empty);
+        => Assert.That(Signo.Core.Preset.Preset.Default.name, Is.Not.Empty);
 
     [Test] public void Default_PortamentoTime_IsZero()
-        => Assert.That(Sinto.Core.Preset.Preset.Default.portamento_time, Is.EqualTo(0f).Within(1e-6f));
+        => Assert.That(Signo.Core.Preset.Preset.Default.portamento_time, Is.EqualTo(0f).Within(1e-6f));
 
     [Test] public void Default_RetroMode_IsClean()
-        => Assert.That(Sinto.Core.Preset.Preset.Default.retro_mode, Is.EqualTo(RetroMode.Clean));
+        => Assert.That(Signo.Core.Preset.Preset.Default.retro_mode, Is.EqualTo(RetroMode.Clean));
 }
 
 // ── OscPreset ─────────────────────────────────────────────────────────
@@ -131,11 +131,11 @@ public class FxPresetTests
 public class ValidatorTests
 {
     [Test] public void Validate_NullInput_ReturnsSafeDefault()
-        => Assert.DoesNotThrow(() => Validator.Validate(Sinto.Core.Preset.Preset.Default));
+        => Assert.DoesNotThrow(() => Validator.Validate(Signo.Core.Preset.Preset.Default));
 
     [Test] public void Validate_OscPulseWidth_ClampedTo0_01_0_99()
     {
-        var raw = new Sinto.Core.Preset.Preset {
+        var raw = new Signo.Core.Preset.Preset {
             osc1 = new OscPreset { pulse_width = 0.0f } // below min
         };
         var validated = Validator.Validate(raw);
@@ -145,7 +145,7 @@ public class ValidatorTests
 
     [Test] public void Validate_FilterCutoff_ClampedTo0_001_0_999()
     {
-        var raw = new Sinto.Core.Preset.Preset {
+        var raw = new Signo.Core.Preset.Preset {
             filter = new FilterPreset { cutoff = 2.0f } // above max
         };
         var validated = Validator.Validate(raw);
@@ -155,7 +155,7 @@ public class ValidatorTests
 
     [Test] public void Validate_EnvelopeAttack_ClampedToMinimum()
     {
-        var raw = new Sinto.Core.Preset.Preset {
+        var raw = new Signo.Core.Preset.Preset {
             amp_envelope = new EnvPreset { attack = 0.0f }
         };
         var validated = Validator.Validate(raw);
@@ -165,7 +165,7 @@ public class ValidatorTests
 
     [Test] public void Validate_DelayFeedback_ClampedTo0_95()
     {
-        var raw = new Sinto.Core.Preset.Preset {
+        var raw = new Signo.Core.Preset.Preset {
             effects = new FxPreset { delay_feedback = 1.0f }
         };
         var validated = Validator.Validate(raw);
@@ -175,7 +175,7 @@ public class ValidatorTests
 
     [Test] public void Validate_FilterResonance_ClampedTo0_1()
     {
-        var raw = new Sinto.Core.Preset.Preset {
+        var raw = new Signo.Core.Preset.Preset {
             filter = new FilterPreset { resonance = 5.0f }
         };
         var validated = Validator.Validate(raw);
@@ -191,7 +191,7 @@ public class LoaderTests
 {
     [Test] public void Load_NonExistentFile_ReturnsDefault()
     {
-        var result = Loader.Load("/nonexistent/path/preset.sinto");
+        var result = Loader.Load("/nonexistent/path/preset.signo");
         Assert.That(result, Is.Not.Null,
             "Load must return Default preset on file-not-found, not throw.");
     }

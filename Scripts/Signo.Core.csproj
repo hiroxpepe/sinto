@@ -4,8 +4,8 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>12</LangVersion>
-    <RootNamespace>Sinto.Core</RootNamespace>
-    <AssemblyName>Sinto.Core</AssemblyName>
+    <RootNamespace>Signo.Core</RootNamespace>
+    <AssemblyName>Signo.Core</AssemblyName>
     <Authors>STUDIO MeowToon</Authors>
     <Description>Pure C# software synthesizer engine</Description>
   </PropertyGroup>

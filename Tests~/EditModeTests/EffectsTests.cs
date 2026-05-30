@@ -4,10 +4,10 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
-using Sinto.Core.Effects;
+using Signo.Core.Effects;
 
 
-namespace Sinto.Tests.Effects;
+namespace Signo.Tests.Effects;
 
 [TestFixture]
 public class ChorusTests
@@ -115,18 +115,18 @@ public class ReverbTests
 public class EffectsTests
 {
     [Test] public void Constructor_DoesNotThrow()
-        => Assert.DoesNotThrow(() => new Sinto.Core.Effects.Effects(44100));
+        => Assert.DoesNotThrow(() => new Signo.Core.Effects.Effects(44100));
 
     [Test] public void Process_DoesNotThrow()
     {
-        var ec = new Sinto.Core.Effects.Effects(44100);
+        var ec = new Signo.Core.Effects.Effects(44100);
         var buf = new float[1024];
         Assert.DoesNotThrow(() => ec.Process(buf.AsSpan(), 2));
     }
 
     [Test] public void ApplySoftClip_OutputStaysWithinPlusMinusOne()
     {
-        var ec = new Sinto.Core.Effects.Effects(44100);
+        var ec = new Signo.Core.Effects.Effects(44100);
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = 10.0f;
         ec.ApplySoftClip(buf.AsSpan());
@@ -136,8 +136,8 @@ public class EffectsTests
 
     [Test] public void Retro_PS1Mode_SampleHold_MaintainsBufferLength_Mono()
     {
-        var ec = new Sinto.Core.Effects.Effects(44100);
-        ec.Retro.mode    = Sinto.Core.Synth.RetroMode.PS1;
+        var ec = new Signo.Core.Effects.Effects(44100);
+        ec.Retro.mode    = Signo.Core.Synth.RetroMode.PS1;
         ec.Retro.enabled = true;
         var buf = new float[1024];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.1f);
@@ -155,8 +155,8 @@ public class EffectsTests
         // buf: [L0,R0, L1,R1, L2,R2, ...] interleaved stereo
         const int Channels = 2;
         const int Frames   = 1024;
-        var ec = new Sinto.Core.Effects.Effects(44100);
-        ec.Retro.mode    = Sinto.Core.Synth.RetroMode.PS1;
+        var ec = new Signo.Core.Effects.Effects(44100);
+        ec.Retro.mode    = Signo.Core.Synth.RetroMode.PS1;
         ec.Retro.enabled = true;
         var buf = new float[Frames * Channels];
         for (int i = 0; i < buf.Length; i++) buf[i] = MathF.Sin(i * 0.07f) * 0.5f;

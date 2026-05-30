@@ -3,9 +3,9 @@
 #nullable enable
 using System;
 using System.Runtime.CompilerServices;
-using Sinto.Core.Audio;
+using Signo.Core.Audio;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>One-pole lowpass parameter smoother. Denormal-safe.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

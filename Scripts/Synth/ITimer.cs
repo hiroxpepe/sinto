@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 #nullable enable
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>
 /// Abstraction over Stopwatch.GetTimestamp() for testability.

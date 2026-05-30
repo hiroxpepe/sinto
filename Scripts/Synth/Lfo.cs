@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>LFO state: Sine/Triangle/Square/S&H + tempo sync.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

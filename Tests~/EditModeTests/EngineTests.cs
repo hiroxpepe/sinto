@@ -1,10 +1,10 @@
 #nullable enable
 using System;
 using NUnit.Framework;
-using Sinto.Core.Audio;
-using Sinto.Core.Synth;
+using Signo.Core.Audio;
+using Signo.Core.Synth;
 
-namespace Sinto.Tests.Synth;
+namespace Signo.Tests.Synth;
 
 [TestFixture]
 public class EngineTests

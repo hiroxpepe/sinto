@@ -1,4 +1,4 @@
-# Sinto — Environment Setup
+# Signo — Environment Setup
 
 **Date:** 2026-05-25  
 **Target OS:** Windows 11 / macOS / Ubuntu 24.04  
@@ -22,8 +22,8 @@ dotnet --version  # expected: 8.x.xxx
 ## 2. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/sinto
-cd sinto
+git clone https://github.com/YOUR_USERNAME/signo
+cd signo
 ```
 
 ---
@@ -51,7 +51,7 @@ Download the following `.nupkg` files and place them in `local-packages/`.
 ### Place downloaded files
 
 ```
-sinto/
+signo/
   local-packages/
     microsoft.net.test.sdk.17.12.0.nupkg
     microsoft.testplatform.testhost.17.12.0.nupkg
@@ -72,8 +72,8 @@ sinto/
 ## 4. Restore and Build
 
 ```bash
-dotnet restore Sinto.sln
-dotnet build Sinto.sln
+dotnet restore Signo.sln
+dotnet build Signo.sln
 ```
 
 ---
@@ -82,16 +82,16 @@ dotnet build Sinto.sln
 
 ```bash
 # All tests
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj"
 
 # Verbose output
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj" --logger "console;verbosity=detailed"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj" --logger "console;verbosity=detailed"
 
 # Exclude benchmarks
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj" --filter "Category!=Benchmark"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj" --filter "Category!=Benchmark"
 
 # Benchmarks only
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj" --filter "Category=Benchmark"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj" --filter "Category=Benchmark"
 ```
 
 Expected output:
@@ -109,8 +109,8 @@ Test Run Successful. Total tests: 4  Passed: 4
 ## 6. Project Structure
 
 ```
-sinto/
-  Sinto.sln
+signo/
+  Signo.sln
   nuget.config                          ← local-packages feed (nuget.org disabled)
   local-packages/                       ← place .nupkg files here (not committed)
   docs/
@@ -120,8 +120,8 @@ sinto/
     class_and_method_design_v1.md
     environment_setup.md
   Scripts/                              ← Unity recognizes this directory
-    Sinto.Core.csproj                   ← for dotnet test (standalone)
-    Sinto.Core.asmdef                   ← for Unity (Germio integration)
+    Signo.Core.csproj                   ← for dotnet test (standalone)
+    Signo.Core.asmdef                   ← for Unity (Germio integration)
     Audio/
       AudioRingBuffer.cs
     Synth/                              ← Phase 2+
@@ -130,8 +130,8 @@ sinto/
     Preset/                             ← Phase 4+
   Tests~/                               ← Unity ignores folders ending with ~
     EditModeTests/
-      Sinto.Tests.EditMode.csproj
-      Sinto.Tests.EditMode.asmdef
+      Signo.Tests.EditMode.csproj
+      Signo.Tests.EditMode.asmdef
       AudioRingBufferTests.cs
     MiniUnity/                          ← Phase 2+ Unity mock harness
 ```
@@ -140,14 +140,14 @@ sinto/
 
 ## 7. Unity Integration (Germio)
 
-`Scripts/Sinto.Core.asmdef` allows Germio to reference Sinto.Core directly.  
+`Scripts/Signo.Core.asmdef` allows Germio to reference Signo.Core directly.  
 Unity-specific code is wrapped in `#if UNITY_5_3_OR_NEWER` — excluded from `dotnet test`.
 
 ---
 
 ## 8. IDE
 
-Open `Sinto.sln` with **Rider**, **Visual Studio 2022**, or **VS Code + C# Dev Kit**.
+Open `Signo.sln` with **Rider**, **Visual Studio 2022**, or **VS Code + C# Dev Kit**.
 
 ---
 

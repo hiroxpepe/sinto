@@ -3,7 +3,7 @@
 #nullable enable
 using System;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Voice manager (polyphony). 32-voice pool with priority-based stealing.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

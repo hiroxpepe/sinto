@@ -3,7 +3,7 @@
 #nullable enable
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>ADSR envelope state machine. Zero-attack bypass for SFX.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

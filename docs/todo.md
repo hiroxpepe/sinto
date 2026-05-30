@@ -1,4 +1,4 @@
-# Sinto TODO List
+# Signo TODO List
 
 ## Hot path optimization (pick up during WPF phase)
 - [ ] TanhFast: remove division → polynomial approximation (Calc.cs only)

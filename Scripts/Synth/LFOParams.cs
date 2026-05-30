@@ -3,7 +3,7 @@
 #nullable enable
 using System.Runtime.InteropServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>LFO parameters. Immutable. RateOrSync field merged for memory efficiency.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

@@ -12,7 +12,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
 internal static class Measure {
     const int SR = 44100;

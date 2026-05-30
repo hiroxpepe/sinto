@@ -3,7 +3,7 @@
 #nullable enable
 using System.Runtime.InteropServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Oscillator parameters. Immutable.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

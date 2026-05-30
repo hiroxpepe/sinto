@@ -1,7 +1,7 @@
 {
-  "name": "Sinto.Tests.EditMode",
-  "rootNamespace": "Sinto.Tests",
-  "references": ["Sinto.Core"],
+  "name": "Signo.Tests.EditMode",
+  "rootNamespace": "Signo.Tests",
+  "references": ["Signo.Core"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

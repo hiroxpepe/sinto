@@ -1,11 +1,11 @@
 // Copyright (c) STUDIO MeowToon. All rights reserved.
 // Licensed under the MIT License.
 #nullable enable
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
-namespace Sinto.Core.Preset;
+namespace Signo.Core.Preset;
 
-/// <summary>Serializable oscillator preset for .sinto JSON.</summary>
+/// <summary>Serializable oscillator preset for .signo JSON.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class OscPreset
 {

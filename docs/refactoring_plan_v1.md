@@ -1,4 +1,4 @@
-# Sinto Refactoring Plan v1
+# Signo Refactoring Plan v1
 
 > **Status:** Pending — awaiting .NET SDK in the execution environment  
 > **Standard reference:** `docs/coding-standards.md` (Stemic v2.2)  
@@ -10,7 +10,7 @@
 
 The refactoring tasks below have been **fully analyzed** but **not yet applied**.
 `dotnet` SDK is not installed in the current execution environment.
-Run `dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj"` before and after
+Run `dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj"` before and after
 applying changes to confirm no regressions.
 
 ---
@@ -332,7 +332,7 @@ The `// ──` section separator comments may remain; only the blank lines befo
 ## 9. Test Command
 
 ```
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj"
 ```
 
 Run before and after all changes. All tests must pass in both runs.

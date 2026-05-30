@@ -2,10 +2,10 @@
 // Licensed under the MIT License.
 #nullable enable
 
-namespace Sinto.Core.Preset;
+namespace Signo.Core.Preset;
 
 /// <summary>
-/// Full synthesizer preset. Loaded from .sinto JSON.
+/// Full synthesizer preset. Loaded from .signo JSON.
 /// Used with double-buffered Interlocked.Exchange for hot-swap.
 /// All parameters validated on load via Validator.
 /// </summary>
@@ -23,7 +23,7 @@ public sealed class Preset
     public LfoPreset        lfo2          { get; init; } = LfoPreset.Default;
     public float            portamento_time{ get; init; } = 0f;
     public FxPreset    effects       { get; init; } = FxPreset.Default;
-    public Sinto.Core.Synth.RetroMode retro_mode { get; init; } = Sinto.Core.Synth.RetroMode.Clean;
+    public Signo.Core.Synth.RetroMode retro_mode { get; init; } = Signo.Core.Synth.RetroMode.Clean;
 
     public static readonly Preset Default = new() { name = "Default" };
 }

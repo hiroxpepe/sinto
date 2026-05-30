@@ -3,7 +3,7 @@
 #nullable enable
 using System;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>Shared processing contract for audio effects.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

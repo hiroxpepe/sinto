@@ -5,15 +5,15 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <LangVersion>12</LangVersion>
-    <RootNamespace>Sinto.Audition</RootNamespace>
-    <AssemblyName>Sinto.Audition</AssemblyName>
+    <RootNamespace>Signo.Audition</RootNamespace>
+    <AssemblyName>Signo.Audition</AssemblyName>
     <Authors>STUDIO MeowToon</Authors>
-    <Description>Audition app for Sinto synthesizer engine (WPF)</Description>
+    <Description>Audition app for Signo synthesizer engine (WPF)</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Scripts\Sinto.Core.csproj" />
+    <ProjectReference Include="..\Scripts\Signo.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

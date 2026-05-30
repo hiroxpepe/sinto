@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>MIDI note with cached frequency. Immutable.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

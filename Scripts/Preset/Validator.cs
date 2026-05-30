@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 #nullable enable
 
-namespace Sinto.Core.Preset;
+namespace Signo.Core.Preset;
 
 /// <summary>Clamp all preset parameters to valid ranges on load.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

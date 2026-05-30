@@ -1,6 +1,6 @@
 {
-  "name": "Sinto.Core",
-  "rootNamespace": "Sinto.Core",
+  "name": "Signo.Core",
+  "rootNamespace": "Signo.Core",
   "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],

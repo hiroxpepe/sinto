@@ -3,7 +3,7 @@
 #nullable enable
 using System;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>Freeverb-style reverb. 4 comb filters + 2 allpass per channel.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

@@ -3,9 +3,9 @@
 #nullable enable
 using System;
 using NUnit.Framework;
-using Sinto.Core.Audio;
+using Signo.Core.Audio;
 
-namespace Sinto.Tests.Audio;
+namespace Signo.Tests.Audio;
 
 [TestFixture]
 public class EventTests

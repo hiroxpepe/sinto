@@ -3,7 +3,7 @@
 #nullable enable
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Audio;
+namespace Signo.Core.Audio;
 
 /// <summary>IIR subnormal protection. No static state — thread-safe.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

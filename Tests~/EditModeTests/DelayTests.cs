@@ -3,9 +3,9 @@
 #nullable enable
 using System;
 using NUnit.Framework;
-using Sinto.Core.Effects;
+using Signo.Core.Effects;
 
-namespace Sinto.Tests.Effects;
+namespace Signo.Tests.Effects;
 
 [TestFixture]
 public class DelayTests

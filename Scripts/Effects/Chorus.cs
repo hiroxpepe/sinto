@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>BBD-style chorus with modulated delay lines.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

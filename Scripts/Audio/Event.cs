@@ -3,7 +3,7 @@
 #nullable enable
 using System.Runtime.InteropServices;
 
-namespace Sinto.Core.Audio;
+namespace Signo.Core.Audio;
 
 /// <summary>Audio-thread event kinds exchanged through the engine queue.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

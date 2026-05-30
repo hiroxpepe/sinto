@@ -3,7 +3,7 @@
 #nullable enable
 using System;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>Stereo delay with fractional read pointer (smooth time changes).</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

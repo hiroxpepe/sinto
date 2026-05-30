@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Single synthesizer voice. Struct — use ref var when mutating array elements.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

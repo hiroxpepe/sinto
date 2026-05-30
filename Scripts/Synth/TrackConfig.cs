@@ -4,7 +4,7 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Per-track voice reservation and stealing policy.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Fast DSP math: SinFast / TanhFast / PitchRatioFast.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

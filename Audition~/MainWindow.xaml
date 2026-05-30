@@ -1,8 +1,8 @@
-<Window x:Class="Sinto.Audition.MainWindow"
+<Window x:Class="Signo.Audition.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        Title="SINTO" Height="470" Width="980"
+        Title="SIGNO" Height="470" Width="980"
         Background="#1c1c1c" Foreground="White"
         ResizeMode="CanMinimize"
         KeyDown="Window_KeyDown" KeyUp="Window_KeyUp"
@@ -151,7 +151,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="SINTO" FontSize="26" FontWeight="Medium" Foreground="White"/>
+                <TextBlock Text="SIGNO" FontSize="26" FontWeight="Medium" Foreground="White"/>
                 <TextBlock Text="PROGRAMMABLE SYNTHESIZER · v0.1.0"
                            FontSize="9" Foreground="#888"/>
             </StackPanel>

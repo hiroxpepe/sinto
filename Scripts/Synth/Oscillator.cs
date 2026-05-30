@@ -4,7 +4,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Band-limited oscillator using polyBLEP for Saw/Square aliasing reduction.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

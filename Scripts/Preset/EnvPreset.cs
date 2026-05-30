@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 #nullable enable
 
-namespace Sinto.Core.Preset;
+namespace Signo.Core.Preset;
 
-/// <summary>Serializable ADSR envelope preset for .sinto JSON.</summary>
+/// <summary>Serializable ADSR envelope preset for .signo JSON.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class EnvPreset
 {

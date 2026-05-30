@@ -10,11 +10,11 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using NAudio.Wave;
 using NAudio.Midi;
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
-namespace Sinto.Audition;
+namespace Signo.Audition;
 
-/// <summary>SINTO α — Roland-style WPF audition.</summary>
+/// <summary>SIGNO α — Roland-style WPF audition.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public partial class MainWindow : Window
 {
@@ -23,7 +23,7 @@ public partial class MainWindow : Window
 
     Engine? _engine;
     WasapiOut? _output;
-    SintoProvider? _provider;
+    SignoProvider? _provider;
     MidiIn? _midi_in;
 
     bool _loaded = false;
@@ -31,12 +31,12 @@ public partial class MainWindow : Window
     WaveType _current_wave = WaveType.Saw;
     FilterKind _current_filter = FilterKind.Moog;
 
-    // Debug log path: sinto_debug.log in working directory
+    // Debug log path: signo_debug.log in working directory
     // DebugLog is compiled only in DEBUG builds (#if DEBUG).
     // Release builds contain zero logging code — no runtime overhead.
 #if DEBUG
     static readonly string LOG_PATH = System.IO.Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "sinto_debug.log");
+        AppDomain.CurrentDomain.BaseDirectory, "signo_debug.log");
 
     static void DebugLog(string msg)
     {
@@ -77,7 +77,7 @@ public partial class MainWindow : Window
         ApplyFilter();
         ApplyEnvelope();
 
-        _provider = new SintoProvider(_engine);
+        _provider = new SignoProvider(_engine);
         // WASAPI exclusive mode for low-latency MIDI playing (no ASIO).
         // Exclusive + small latency gives ~5-15ms; fall back to shared if the
         // device refuses exclusive or the IEEE-float format is unsupported.
@@ -122,7 +122,7 @@ public partial class MainWindow : Window
         ApplyFilter();
         ApplyFilterEnv();
         ApplyEnvelope();
-        DebugLog($"=== SINTO started. Log: {LOG_PATH} ===");
+        DebugLog($"=== SIGNO started. Log: {LOG_PATH} ===");
         InitMidi();
     }
 
@@ -573,7 +573,7 @@ public partial class MainWindow : Window
     }
 }
 
-/// <summary>NAudio bridge — converts Sinto's Span output to NAudio sample provider.</summary>
+/// <summary>NAudio bridge — converts Signo's Span output to NAudio sample provider.</summary>
 // A note command queued from any thread (MIDI thread, UI thread). The audio
 // callback is the SINGLE consumer that forwards them to the engine, so the
 // engine's SPSC event queue keeps exactly one producer (the audio thread) and
@@ -589,13 +589,13 @@ internal readonly struct NoteCommand
     }
 }
 
-internal sealed class SintoProvider : ISampleProvider
+internal sealed class SignoProvider : ISampleProvider
 {
     readonly Engine _engine;
     // Multiple-producer safe; drained by the audio thread only.
     readonly System.Collections.Concurrent.ConcurrentQueue<NoteCommand> _notes = new();
     public WaveFormat WaveFormat { get; }
-    public SintoProvider(Engine engine)
+    public SignoProvider(Engine engine)
     {
         _engine = engine;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);

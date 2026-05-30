@@ -1,25 +1,25 @@
-# Sinto — Coding Standards
+# Signo — Coding Standards
 
-> **Sinto**: Pure C# Software Synthesizer Engine for Germio  
+> **Signo**: Pure C# Software Synthesizer Engine for Germio  
 > A real-time DSP library that runs standalone via dotnet test and integrates with Unity via asmdef.
 
 ## Build & Test
 
 ### Running Tests
 ```sh
-dotnet restore Sinto.sln
-dotnet build Sinto.sln
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj"
+dotnet restore Signo.sln
+dotnet build Signo.sln
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj"
 ```
 
 **Single test by class:**
 ```sh
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj" --filter "FullyQualifiedName~EngineTests"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj" --filter "FullyQualifiedName~EngineTests"
 ```
 
 **Exclude benchmarks:**
 ```sh
-dotnet test "Tests~/EditModeTests/Sinto.Tests.EditMode.csproj" --filter "Category!=Benchmark"
+dotnet test "Tests~/EditModeTests/Signo.Tests.EditMode.csproj" --filter "Category!=Benchmark"
 ```
 
 Test structure:
@@ -35,16 +35,16 @@ Test structure:
 ### Namespace & Directory Structure
 
 ```
-Sinto.Core.Audio      ← Thread communication (RingBuffer / Event / Denormal)
+Signo.Core.Audio      ← Thread communication (RingBuffer / Event / Denormal)
   ↓ depends on nothing
 
-Sinto.Core.Synth      ← Voice synthesis (Engine / Voice / Oscillator / Envelope / Filter / Lfo)
+Signo.Core.Synth      ← Voice synthesis (Engine / Voice / Oscillator / Envelope / Filter / Lfo)
   ↓ depends on Audio
 
-Sinto.Core.Effects    ← Effects processing (Chorus / Reverb / Delay / Retro / Effects)
+Signo.Core.Effects    ← Effects processing (Chorus / Reverb / Delay / Retro / Effects)
   ↓ depends on Synth
 
-Sinto.Core.Preset     ← Data persistence (Preset / Loader / Validator)
+Signo.Core.Preset     ← Data persistence (Preset / Loader / Validator)
   ↓ depends on Synth + Effects
 ```
 
@@ -54,15 +54,15 @@ Sinto.Core.Preset     ← Data persistence (Preset / Loader / Validator)
 
 ```
 Scripts/                        ← Unity recognizes this directory
-  Sinto.Core.csproj             ← for dotnet test (standalone)
-  Sinto.Core.asmdef             ← for Unity (Germio integration)
+  Signo.Core.csproj             ← for dotnet test (standalone)
+  Signo.Core.asmdef             ← for Unity (Germio integration)
   Audio/
     RingBuffer.cs               ← AudioRingBuffer<T>
     Event.cs                    ← ControlEvent + EventKind enum
     Denormal.cs                 ← DenormalGuard
   Synth/
     Enums.cs                    ← WaveType / PlayState / Interpolation / FilterKind / RetroMode / LfoWave / LfoTarget
-    Calc.cs                     ← SintoMath (fast DSP math)
+    Calc.cs                     ← SignoMath (fast DSP math)
     Smoother.cs                 ← SmoothedParameter
     Note.cs
     OscParams.cs                ← OscillatorParams
@@ -77,8 +77,8 @@ Scripts/                        ← Unity recognizes this directory
     Voice.cs
     Voices.cs                   ← VoiceManager
     Scaler.cs                   ← VoiceScaler
-    Engine.cs                   ← SintoEngine
-    MicroEngine.cs              ← SintoMicroEngine
+    Engine.cs                   ← SignoEngine
+    MicroEngine.cs              ← SignoMicroEngine
     ITimer.cs                   ← ITimer + SystemTimer + FakeTimeProvider
   Effects/
     IEffect.cs
@@ -89,7 +89,7 @@ Scripts/                        ← Unity recognizes this directory
     Retro.cs                    ← RetroFilter
     Effects.cs                  ← EffectsChain
   Preset/
-    Preset.cs                   ← SintoPreset
+    Preset.cs                   ← SignoPreset
     OscPreset.cs                ← OscillatorPreset
     FilterPreset.cs
     EnvPreset.cs                ← EnvelopePreset
@@ -100,8 +100,8 @@ Scripts/                        ← Unity recognizes this directory
 
 Tests~/                         ← Unity ignores folders ending with ~
   EditModeTests/
-    Sinto.Tests.EditMode.csproj
-    Sinto.Tests.EditMode.asmdef
+    Signo.Tests.EditMode.csproj
+    Signo.Tests.EditMode.asmdef
     *Tests.cs
   MiniUnity/
     FakeTimeProvider.cs         ← ITimer implementation for deterministic tests
@@ -111,7 +111,7 @@ Tests~/                         ← Unity ignores folders ending with ~
 
 ## Class Name Reference
 
-### Audio (`Sinto.Core.Audio`)
+### Audio (`Signo.Core.Audio`)
 
 | Class | Kind | Description |
 |---|---|---|
@@ -120,7 +120,7 @@ Tests~/                         ← Unity ignores folders ending with ~
 | `EventKind` | enum | Event type discriminator |
 | `Denormal` | static class | IIR subnormal protection |
 
-### Synth (`Sinto.Core.Synth`)
+### Synth (`Signo.Core.Synth`)
 
 | Class | Kind | Description |
 |---|---|---|
@@ -151,7 +151,7 @@ Tests~/                         ← Unity ignores folders ending with ~
 | `LfoWave` | enum | LFO waveform |
 | `LfoTarget` | flags enum | LFO modulation destination |
 
-### Effects (`Sinto.Core.Effects`)
+### Effects (`Signo.Core.Effects`)
 
 | Class | Kind | Description |
 |---|---|---|
@@ -163,7 +163,7 @@ Tests~/                         ← Unity ignores folders ending with ~
 | `Retro` | sealed class | Retro filter (N64 / PS1) |
 | `Effects` | sealed class | Serial effects chain |
 
-### Preset (`Sinto.Core.Preset`)
+### Preset (`Signo.Core.Preset`)
 
 | Class | Kind | Description |
 |---|---|---|
@@ -174,7 +174,7 @@ Tests~/                         ← Unity ignores folders ending with ~
 | `LfoPreset` | sealed class | LFO preset data |
 | `FxPreset` | sealed class | Effects preset data |
 | `Validator` | static class | Preset parameter clamping |
-| `Loader` | static class | .sinto JSON file loading |
+| `Loader` | static class | .signo JSON file loading |
 
 ---
 
@@ -182,7 +182,7 @@ Tests~/                         ← Unity ignores folders ending with ~
 
 | Category | Rule | Example |
 |---|---|---|
-| **Class names** | Single word, no project prefix | `Engine` (not `SintoEngine`) |
+| **Class names** | Single word, no project prefix | `Engine` (not `SignoEngine`) |
 | **Data class properties** | `snake_case` (matches JSON keys) | `amp_envelope`, `lfo1` |
 | **Non-data public properties** | `camelCase` | `isActive`, `currentBpm` |
 | **Private fields** | `_snake_case` | `_sample_rate`, `_is_paused` |
@@ -273,14 +273,14 @@ Assert.That(result, Is.Not.Null);
 
 ## Assembly & Namespace
 
-**Scripts assembly** (`Scripts/Sinto.Core.asmdef`):
+**Scripts assembly** (`Scripts/Signo.Core.asmdef`):
 - Platform: all (Unity + standalone)
 - Allow unsafe: true
-- Namespaces: `Sinto.Core.*`
+- Namespaces: `Signo.Core.*`
 
-**Test project** (`Tests~/EditModeTests/Sinto.Tests.EditMode.csproj`):
+**Test project** (`Tests~/EditModeTests/Signo.Tests.EditMode.csproj`):
 - Shares source compilation of `Scripts/**/*.cs`
-- Namespace: `Sinto.Tests.*`
+- Namespace: `Signo.Tests.*`
 - Never imports compiled assembly — uses shared source
 
 ---
@@ -291,7 +291,7 @@ Assert.That(result, Is.Not.Null);
 - **docs/development_plan_v1.md**: Roadmap and task breakdown
 - **docs/synthesizer_spec_v1.md**: Full synthesizer specification
 - **docs/class_and_method_design_v1.md**: Class and method design (pre-refactor reference)
-- **Germio repo**: Unity game project; references Sinto via asmdef
+- **Germio repo**: Unity game project; references Signo via asmdef
 
 ---
 

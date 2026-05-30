@@ -6,9 +6,9 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace Sinto.Core.Preset;
+namespace Signo.Core.Preset;
 
-/// <summary>Load .sinto JSON preset files. Returns Default on any error.</summary>
+/// <summary>Load .signo JSON preset files. Returns Default on any error.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public static class Loader {
     static readonly JsonSerializerOptions OPTIONS = new() {

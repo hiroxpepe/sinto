@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
-using Sinto.Core.Synth;
+using Signo.Core.Synth;
 
-namespace Sinto.Core.Effects;
+namespace Signo.Core.Effects;
 
 /// <summary>Serial effects chain: Chorus → Reverb → Delay → Retro → SoftClip.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

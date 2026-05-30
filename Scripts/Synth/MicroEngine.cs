@@ -2,10 +2,10 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
-using Sinto.Core.Audio;
-using Sinto.Core.Effects;
+using Signo.Core.Audio;
+using Signo.Core.Effects;
 
-namespace Sinto.Core.Synth;
+namespace Signo.Core.Synth;
 
 /// <summary>Lightweight single-voice SFX processor. Mono → stereo duplicate.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>

@@ -3,10 +3,10 @@
 #nullable enable
 using System;
 using NUnit.Framework;
-using Sinto.Core.Synth;
-using Filter = Sinto.Core.Synth.Filter;
+using Signo.Core.Synth;
+using Filter = Signo.Core.Synth.Filter;
 
-namespace Sinto.Tests.Synth;
+namespace Signo.Tests.Synth;
 
 [TestFixture]
 public class FilterTests
