@@ -41,6 +41,8 @@ public sealed class Engine : IDisposable {
     float[] _fx_scratch = new float[0];
     float    _osc1_level     = 1.0f;
     float    _osc2_level     = 0.5f;
+    float    _osc1_pw        = 0.5f;
+    float    _osc2_pw        = 0.5f;
     float    _detune_cents   = 0f;
     EnvParams _current_amp_env = EnvParams.Default;
 
@@ -102,6 +104,15 @@ public sealed class Engine : IDisposable {
         _osc1_wave = osc1Wave;
         _osc2_wave = osc2Wave;
         _current_wave = osc1Wave;
+    }
+
+    /// <summary>Square-wave pulse width per oscillator (0.01..0.99, 0.5 = square).</summary>
+    public void SetPulseWidth(float osc1Pw, float osc2Pw) {
+        _osc1_pw = Clamp01(osc1Pw);
+        _osc2_pw = Clamp01(osc2Pw);
+        if (_osc1_pw < 0.01f) _osc1_pw = 0.01f; else if (_osc1_pw > 0.99f) _osc1_pw = 0.99f;
+        if (_osc2_pw < 0.01f) _osc2_pw = 0.01f; else if (_osc2_pw > 0.99f) _osc2_pw = 0.99f;
+        _voices.SetPulseWidth(_osc1_pw, _osc2_pw);
     }
 
     /// <summary>Portamento glide time in seconds (applied per-voice on NoteOn).</summary>
@@ -334,8 +345,8 @@ public sealed class Engine : IDisposable {
             if (next >= 0) {
                 _voices.NoteOn(
                     new Note(next, 0.8f, _arp_track_id, 5),
-                    new OscParams(_osc1_wave, level: _osc1_level),
-                    new OscParams(_osc2_wave, detuneCents: _detune_cents, level: _osc2_level),
+                    new OscParams(_osc1_wave, pulseWidth: _osc1_pw, level: _osc1_level),
+                    new OscParams(_osc2_wave, detuneCents: _detune_cents, pulseWidth: _osc2_pw, level: _osc2_level),
                     _current_amp_env, EnvParams.Default, EnvParams.Default);
                 _current_arp_note = next;
             } else {
@@ -355,8 +366,8 @@ public sealed class Engine : IDisposable {
                 } else {
                     _voices.NoteOn(
                         new Note(ev.IntParam, ev.FloatParam, ev.TrackId, ev.Priority),
-                        new OscParams(_osc1_wave, level: _osc1_level),
-                        new OscParams(_osc2_wave, detuneCents: _detune_cents, level: _osc2_level),
+                        new OscParams(_osc1_wave, pulseWidth: _osc1_pw, level: _osc1_level),
+                        new OscParams(_osc2_wave, detuneCents: _detune_cents, pulseWidth: _osc2_pw, level: _osc2_level),
                         _current_amp_env, EnvParams.Default, EnvParams.Default);
                 }
                 break;

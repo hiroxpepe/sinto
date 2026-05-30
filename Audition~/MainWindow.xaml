@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        Title="SIGNO" Height="510" Width="1400"
+        Title="SIGNO" Height="470" Width="1050"
         Background="#0a0a0c" Foreground="White"
         ResizeMode="CanMinimize"
         KeyDown="Window_KeyDown" KeyUp="Window_KeyUp"
@@ -19,6 +19,17 @@
         <SolidColorBrush x:Key="FxColor"  Color="#8e44ad"/>
 
         <sys:Double x:Key="SectionH">152</sys:Double>
+        <!-- Shared height of the button row so all panels' slider rows start at
+             the same Y and their slider bottoms line up. -->
+        <sys:Double x:Key="SecBtnH">58</sys:Double>
+        <!-- Per-panel fixed widths (px). Tweak these to adjust the layout. -->
+        <GridLength x:Key="ColLfoW">100</GridLength>
+        <GridLength x:Key="ColDcoW">290</GridLength>
+        <GridLength x:Key="ColHpfW">50</GridLength>
+        <GridLength x:Key="ColDcfW">135</GridLength>
+        <GridLength x:Key="ColDcaW">80</GridLength>
+        <GridLength x:Key="ColEnvW">135</GridLength>
+        <GridLength x:Key="ColFxW">225</GridLength>
 
         <Style TargetType="Border" x:Key="SectionBorder">
             <Setter Property="Background" Value="#141416"/>
@@ -40,6 +51,11 @@
             <Setter Property="Foreground" Value="#999999"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,2,0,0"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.3"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style TargetType="TextBlock" x:Key="SliderVal">
@@ -48,6 +64,11 @@
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,2,0,0"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.3"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Vertical slider with visible thumb -->
@@ -82,6 +103,11 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.3"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Small toggle-style button -->
@@ -132,203 +158,267 @@
         <!-- ===== Main 7 sections ===== -->
         <Grid Grid.Row="1" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="0.6*"/>
-                <ColumnDefinition Width="1.5*"/>
-                <ColumnDefinition Width="0.42*"/>
-                <ColumnDefinition Width="0.85*"/>
-                <ColumnDefinition Width="0.5*"/>
-                <ColumnDefinition Width="0.82*"/>
-                <ColumnDefinition Width="1.5*"/>
+                <ColumnDefinition Width="{StaticResource ColLfoW}"/>
+                <ColumnDefinition Width="{StaticResource ColDcoW}"/>
+                <ColumnDefinition Width="{StaticResource ColHpfW}"/>
+                <ColumnDefinition Width="{StaticResource ColDcfW}"/>
+                <ColumnDefinition Width="{StaticResource ColDcaW}"/>
+                <ColumnDefinition Width="{StaticResource ColEnvW}"/>
+                <ColumnDefinition Width="{StaticResource ColFxW}"/>
             </Grid.ColumnDefinitions>
 
             <!-- LFO -->
             <Border Grid.Column="0" Style="{StaticResource SectionBorder}" Height="{StaticResource SectionH}" Margin="0,0,3,0">
-                <StackPanel>
-                    <Border Background="{StaticResource LfoColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
-                    <TextBlock Text="LFO" Style="{StaticResource SectionLabel}" Foreground="{StaticResource LfoColor}"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <StackPanel Margin="4,0">
-                            <Slider x:Name="SldLfoRate" Style="{StaticResource VSlider}" Value="40" Foreground="{StaticResource LfoColor}" ValueChanged="LfoSld_Changed"/>
-                            <TextBlock x:Name="ValLfoRate" Text="40" Style="{StaticResource SliderVal}"/>
-                            <TextBlock x:Name="LblLfoRate" Text="RATE" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="4,0">
-                            <Slider x:Name="SldLfoDelay" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource LfoColor}" ValueChanged="LfoSld_Changed"/>
-                            <TextBlock x:Name="ValLfoDelay" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="DLY" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>  <!-- header -->
+                        <RowDefinition Height="Auto"/>  <!-- buttons -->
+                        <RowDefinition Height="*"/>     <!-- sliders -->
+                        <RowDefinition Height="Auto"/>  <!-- values -->
+                        <RowDefinition Height="Auto"/>  <!-- labels -->
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2">
+                        <Border Background="{StaticResource LfoColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
+                        <TextBlock Text="LFO" Style="{StaticResource SectionLabel}" Foreground="{StaticResource LfoColor}"/>
                     </StackPanel>
-                    <WrapPanel HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Center" Margin="0,2,0,4">
                         <Button Content="&#8767;" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="lfowave:sine"/>
                         <Button Content="&#9651;" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="lfowave:tri"/>
                         <Button Content="&#8851;" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="lfowave:square"/>
                         <Button Content="S/H" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="lfowave:sh"/>
                     </WrapPanel>
-                </StackPanel>
+                    <Slider Grid.Row="2" Grid.Column="0" x:Name="SldLfoRate" Style="{StaticResource VSlider}" Value="40" Foreground="{StaticResource LfoColor}" ValueChanged="LfoSld_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="1" x:Name="SldLfoDelay" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource LfoColor}" ValueChanged="LfoSld_Changed" VerticalAlignment="Bottom"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" x:Name="ValLfoRate" Text="40" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ValLfoDelay" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" x:Name="LblLfoRate" Text="RATE" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="DLY" Style="{StaticResource SliderName}"/>
+                </Grid>
             </Border>
 
             <!-- DCO -->
             <Border Grid.Column="1" Style="{StaticResource SectionBorder}" Height="{StaticResource SectionH}" Margin="0,0,3,0">
-                <StackPanel>
-                    <Border Background="{StaticResource DcoColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
-                    <TextBlock Text="DCO" Style="{StaticResource SectionLabel}" Foreground="{StaticResource DcoColor}"/>
-                    <Grid>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>  <!-- header -->
+                        <RowDefinition Height="*"/>     <!-- body -->
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0">
+                        <Border Background="{StaticResource DcoColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
+                        <TextBlock Text="DCO" Style="{StaticResource SectionLabel}" Foreground="{StaticResource DcoColor}"/>
+                    </StackPanel>
+                    <!-- body: [OSC1 buttons][OSC1 sliders][OSC2 buttons][OSC2 sliders] -->
+                    <Grid Grid.Row="1" HorizontalAlignment="Center">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>  <!-- OSC1 buttons -->
+                            <ColumnDefinition Width="Auto"/>  <!-- OSC1 sliders -->
+                            <ColumnDefinition Width="Auto"/>  <!-- OSC2 buttons -->
+                            <ColumnDefinition Width="Auto"/>  <!-- OSC2 sliders -->
                         </Grid.ColumnDefinitions>
-                        <!-- OSC1 -->
-                        <StackPanel Grid.Column="0" Margin="2,0" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="OSC 1" FontSize="8" Foreground="{StaticResource DcoColor}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
-                                <UniformGrid Columns="2" Rows="3">
-                                    <Button x:Name="WaveSaw" Content="SAW" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:saw"/>
-                                    <Button x:Name="WaveSqr" Content="SQR" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:sqr"/>
-                                    <Button x:Name="WaveTri" Content="TRI" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:tri"/>
-                                    <Button x:Name="WaveSin" Content="SIN" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:sin"/>
-                                    <Button x:Name="WaveNoi" Content="W" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:w"/>
-                                    <Button x:Name="Osc1Pink" Content="P" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:p"/>
-                                </UniformGrid>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                    <Button Content="16" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1range:16"/>
-                                    <Button Content="8" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1range:8"/>
-                                    <Button Content="4" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1range:4"/>
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel Margin="6,0,0,0" VerticalAlignment="Center">
-                                <Slider x:Name="SldOsc1Lvl" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed"/>
-                                <TextBlock x:Name="ValOsc1Lvl" Text="100" Style="{StaticResource SliderVal}"/>
-                                <TextBlock Text="LVL" Style="{StaticResource SliderName}"/>
+                        <!-- OSC1 buttons -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Top" Margin="4,0">
+                            <TextBlock Text="OSC 1" FontSize="8" Foreground="{StaticResource DcoColor}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
+                            <UniformGrid Columns="2" Rows="3">
+                                <Button x:Name="WaveSaw" Content="SAW" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:saw"/>
+                                <Button x:Name="WaveSqr" Content="SQR" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:sqr"/>
+                                <Button x:Name="WaveTri" Content="TRI" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:tri"/>
+                                <Button x:Name="WaveSin" Content="SIN" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:sin"/>
+                                <Button x:Name="WaveNoi" Content="W" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:w"/>
+                                <Button x:Name="Osc1Pink" Content="P" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1wave:p"/>
+                            </UniformGrid>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                <Button Content="16" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1range:16"/>
+                                <Button Content="8" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1range:8"/>
+                                <Button Content="4" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc1range:4"/>
                             </StackPanel>
                         </StackPanel>
-                        <!-- OSC2 -->
-                        <StackPanel Grid.Column="1" Margin="2,0" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="OSC 2" FontSize="8" Foreground="{StaticResource DcoColor}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
-                                <UniformGrid Columns="2" Rows="3">
-                                    <Button Content="SAW" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:saw"/>
-                                    <Button Content="SQR" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:sqr"/>
-                                    <Button Content="TRI" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:tri"/>
-                                    <Button Content="SIN" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:sin"/>
-                                    <Button Content="W" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:w"/>
-                                    <Button Content="P" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:p"/>
-                                </UniformGrid>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                    <Button Content="16" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2range:16"/>
-                                    <Button Content="8" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2range:8"/>
-                                    <Button Content="4" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2range:4"/>
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center">
-                                <StackPanel Margin="2,0">
-                                    <Slider x:Name="SldOsc2Lvl" Style="{StaticResource VSlider}" Value="50" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed"/>
-                                    <TextBlock x:Name="ValOsc2Lvl" Text="50" Style="{StaticResource SliderVal}"/>
-                                    <TextBlock Text="LVL" Style="{StaticResource SliderName}"/>
-                                </StackPanel>
-                                <StackPanel Margin="2,0">
-                                    <Slider x:Name="SldDetune" Style="{StaticResource VSlider}" Value="50" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed"/>
-                                    <TextBlock x:Name="ValDetune" Text="0" Style="{StaticResource SliderVal}"/>
-                                    <TextBlock Text="DET" Style="{StaticResource SliderName}"/>
-                                </StackPanel>
+                        <!-- OSC1 sliders -->
+                        <Grid Grid.Column="1" Margin="4,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider Grid.Row="0" Grid.Column="0" x:Name="SldOsc1Lvl" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed" VerticalAlignment="Bottom"/>
+                            <Slider Grid.Row="0" Grid.Column="1" x:Name="SldOsc1Pw" Style="{StaticResource VSlider}" Minimum="1" Maximum="99" Value="50" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed" VerticalAlignment="Bottom"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" x:Name="ValOsc1Lvl" Text="100" Style="{StaticResource SliderVal}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ValOsc1Pw" Text="50" Style="{StaticResource SliderVal}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="LVL" Style="{StaticResource SliderName}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="Osc1PwPanel" Text="PW" Style="{StaticResource SliderName}"/>
+                        </Grid>
+                        <!-- OSC2 buttons -->
+                        <StackPanel Grid.Column="2" VerticalAlignment="Top" Margin="4,0">
+                            <TextBlock Text="OSC 2" FontSize="8" Foreground="{StaticResource DcoColor}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
+                            <UniformGrid Columns="2" Rows="3">
+                                <Button Content="SAW" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:saw"/>
+                                <Button Content="SQR" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:sqr"/>
+                                <Button Content="TRI" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:tri"/>
+                                <Button Content="SIN" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:sin"/>
+                                <Button Content="W" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:w"/>
+                                <Button Content="P" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2wave:p"/>
+                            </UniformGrid>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                <Button Content="16" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2range:16"/>
+                                <Button Content="8" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2range:8"/>
+                                <Button Content="4" Style="{StaticResource SmallBtn}" Click="GroupBtn_Click" Tag="osc2range:4"/>
                             </StackPanel>
                         </StackPanel>
+                        <!-- OSC2 sliders -->
+                        <Grid Grid.Column="3" Margin="4,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider Grid.Row="0" Grid.Column="0" x:Name="SldOsc2Lvl" Style="{StaticResource VSlider}" Value="50" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed" VerticalAlignment="Bottom"/>
+                            <Slider Grid.Row="0" Grid.Column="1" x:Name="SldDetune" Style="{StaticResource VSlider}" Value="50" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed" VerticalAlignment="Bottom"/>
+                            <Slider Grid.Row="0" Grid.Column="2" x:Name="SldOsc2Pw" Style="{StaticResource VSlider}" Minimum="1" Maximum="99" Value="50" Foreground="{StaticResource DcoColor}" ValueChanged="Osc_Changed" VerticalAlignment="Bottom"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" x:Name="ValOsc2Lvl" Text="50" Style="{StaticResource SliderVal}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ValDetune" Text="0" Style="{StaticResource SliderVal}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" x:Name="ValOsc2Pw" Text="50" Style="{StaticResource SliderVal}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="LVL" Style="{StaticResource SliderName}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="DET" Style="{StaticResource SliderName}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="2" x:Name="Osc2PwPanel" Text="PW" Style="{StaticResource SliderName}"/>
+                        </Grid>
                     </Grid>
-                </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- HPF (mock) -->
+            <!-- HPF -->
             <Border Grid.Column="2" Style="{StaticResource SectionBorder}" Height="{StaticResource SectionH}" Margin="0,0,3,0">
-                <StackPanel>
-                    <Border Background="{StaticResource HpfColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
-                    <TextBlock Text="HPF" Style="{StaticResource SectionLabel}" Foreground="{StaticResource HpfColor}"/>
-                    <Slider x:Name="SldHpf" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource HpfColor}" ValueChanged="Hpf_Changed"/>
-                    <TextBlock Text="FREQ" Style="{StaticResource SliderName}"/>
-                    <TextBlock Text="(soon)" FontSize="8" Foreground="#666" HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0">
+                        <Border Background="{StaticResource HpfColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
+                        <TextBlock Text="HPF" Style="{StaticResource SectionLabel}" Foreground="{StaticResource HpfColor}"/>
+                    </StackPanel>
+                    <Border Grid.Row="1" MinHeight="4"/>
+                    <Slider Grid.Row="2" x:Name="SldHpf" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource HpfColor}" ValueChanged="Hpf_Changed" VerticalAlignment="Bottom"/>
+                    <TextBlock Grid.Row="3" x:Name="ValHpf" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="4" Text="FREQ" Style="{StaticResource SliderName}"/>
+                </Grid>
             </Border>
 
             <!-- DCF -->
             <Border Grid.Column="3" Style="{StaticResource SectionBorder}" Height="{StaticResource SectionH}" Margin="0,0,3,0">
-                <StackPanel>
-                    <Border Background="{StaticResource DcfColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
-                    <TextBlock Text="DCF" Style="{StaticResource SectionLabel}" Foreground="{StaticResource DcfColor}"/>
-                    <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="4">
+                        <Border Background="{StaticResource DcfColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
+                        <TextBlock Text="DCF" Style="{StaticResource SectionLabel}" Foreground="{StaticResource DcfColor}"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="1" Grid.ColumnSpan="4" HorizontalAlignment="Center" Margin="0,0,0,4">
                         <Button x:Name="FiltMoog" Content="MOOG" Style="{StaticResource SmallBtn}" Click="FiltBtn_Click" Tag="1"/>
                         <Button x:Name="FiltRol" Content="ROLAND" Style="{StaticResource SmallBtn}" Click="FiltBtn_Click" Tag="0"/>
                     </WrapPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <StackPanel Margin="2,0">
-                            <Slider x:Name="SldCutoff" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource DcfColor}" ValueChanged="Filter_Changed"/>
-                            <TextBlock x:Name="ValCutoff" Text="100" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="CUT" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="2,0">
-                            <Slider x:Name="SldReso" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcfColor}" ValueChanged="Filter_Changed"/>
-                            <TextBlock x:Name="ValReso" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="RES" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="2,0">
-                            <Slider x:Name="SldEnvAmt" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcfColor}" ValueChanged="Filter_Changed"/>
-                            <TextBlock x:Name="ValEnvAmt" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="ENV" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="2,0">
-                            <Slider x:Name="SldDcfLfo" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcfColor}" ValueChanged="ModLfo_Changed"/>
-                            <TextBlock x:Name="ValDcfLfo" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="LFO" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </StackPanel>
+                    <Slider Grid.Row="2" Grid.Column="0" x:Name="SldCutoff" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource DcfColor}" ValueChanged="Filter_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="1" x:Name="SldReso" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcfColor}" ValueChanged="Filter_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="2" x:Name="SldEnvAmt" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcfColor}" ValueChanged="Filter_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="3" x:Name="SldDcfLfo" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcfColor}" ValueChanged="ModLfo_Changed" VerticalAlignment="Bottom"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" x:Name="ValCutoff" Text="100" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ValReso" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="2" x:Name="ValEnvAmt" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="3" x:Name="ValDcfLfo" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="CUT" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="RES" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="2" Text="ENV" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="3" Text="LFO" Style="{StaticResource SliderName}"/>
+                </Grid>
             </Border>
 
             <!-- DCA -->
             <Border Grid.Column="4" Style="{StaticResource SectionBorder}" Height="{StaticResource SectionH}" Margin="0,0,3,0">
-                <StackPanel>
-                    <Border Background="{StaticResource DcaColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
-                    <TextBlock Text="DCA" Style="{StaticResource SectionLabel}" Foreground="{StaticResource DcaColor}"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <StackPanel Margin="2,0">
-                            <Slider x:Name="SldLevel" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource DcaColor}" ValueChanged="Level_Changed"/>
-                            <TextBlock x:Name="ValLevel" Text="100" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="LVL" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="2,0">
-                            <Slider x:Name="SldDcaLfo" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcaColor}" ValueChanged="ModLfo_Changed"/>
-                            <TextBlock x:Name="ValDcaLfo" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="LFO" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>  <!-- header -->
+                        <RowDefinition Height="Auto"/>  <!-- top controls (none here) -->
+                        <RowDefinition Height="*"/>     <!-- sliders (stretch) -->
+                        <RowDefinition Height="Auto"/>  <!-- values -->
+                        <RowDefinition Height="Auto"/>  <!-- labels -->
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2">
+                        <Border Background="{StaticResource DcaColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
+                        <TextBlock Text="DCA" Style="{StaticResource SectionLabel}" Foreground="{StaticResource DcaColor}"/>
                     </StackPanel>
-                </StackPanel>
+                    <Border Grid.Row="1" Grid.ColumnSpan="2" MinHeight="4"/>
+                    <Slider Grid.Row="2" Grid.Column="0" x:Name="SldLevel" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource DcaColor}" ValueChanged="Level_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="1" x:Name="SldDcaLfo" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource DcaColor}" ValueChanged="ModLfo_Changed" VerticalAlignment="Bottom"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" x:Name="ValLevel" Text="100" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ValDcaLfo" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="LVL" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="LFO" Style="{StaticResource SliderName}"/>
+                </Grid>
             </Border>
 
             <!-- ENV -->
             <Border Grid.Column="5" Style="{StaticResource SectionBorder}" Height="{StaticResource SectionH}" Margin="0,0,3,0">
-                <StackPanel>
-                    <Border Background="{StaticResource EnvColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
-                    <TextBlock Text="ENV" Style="{StaticResource SectionLabel}" Foreground="{StaticResource EnvColor}"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <StackPanel Margin="1,0">
-                            <Slider x:Name="SldA" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed"/>
-                            <TextBlock x:Name="ValA" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="A" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="1,0">
-                            <Slider x:Name="SldD" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed"/>
-                            <TextBlock x:Name="ValD" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="D" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="1,0">
-                            <Slider x:Name="SldS" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed"/>
-                            <TextBlock x:Name="ValS" Text="100" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="S" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
-                        <StackPanel Margin="1,0">
-                            <Slider x:Name="SldR" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed"/>
-                            <TextBlock x:Name="ValR" Text="0" Style="{StaticResource SliderVal}"/>
-                            <TextBlock Text="R" Style="{StaticResource SliderName}"/>
-                        </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="4">
+                        <Border Background="{StaticResource EnvColor}" Height="5" CornerRadius="6,6,0,0" Margin="-1,-1,-1,0"/>
+                        <TextBlock Text="ENV" Style="{StaticResource SectionLabel}" Foreground="{StaticResource EnvColor}"/>
                     </StackPanel>
-                </StackPanel>
+                    <Border Grid.Row="1" Grid.ColumnSpan="4" MinHeight="4"/>
+                    <Slider Grid.Row="2" Grid.Column="0" x:Name="SldA" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="1" x:Name="SldD" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="2" x:Name="SldS" Style="{StaticResource VSlider}" Value="100" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed" VerticalAlignment="Bottom"/>
+                    <Slider Grid.Row="2" Grid.Column="3" x:Name="SldR" Style="{StaticResource VSlider}" Value="0" Foreground="{StaticResource EnvColor}" ValueChanged="Env_Changed" VerticalAlignment="Bottom"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" x:Name="ValA" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ValD" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="2" x:Name="ValS" Text="100" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="3" x:Name="ValR" Text="0" Style="{StaticResource SliderVal}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="A" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="D" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="2" Text="S" Style="{StaticResource SliderName}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="3" Text="R" Style="{StaticResource SliderName}"/>
+                </Grid>
             </Border>
 
             <!-- FX: BOSS-style pedals with rotary knobs (Chorus / Delay / Reverb) -->
@@ -467,7 +557,7 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Style="{StaticResource SectionBorder}" Margin="0,0,6,0" Padding="12,8" VerticalAlignment="Stretch">
-                <StackPanel VerticalAlignment="Center">
+                <StackPanel VerticalAlignment="Top">
                     <TextBlock Text="PORTA" FontSize="8" FontWeight="Bold" Foreground="#999" HorizontalAlignment="Center"/>
                     <TextBlock Text="MENTO" FontSize="8" FontWeight="Bold" Foreground="#999" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                     <Slider x:Name="SldPortamento" Style="{StaticResource VSlider}" Height="40" Value="0" Foreground="#999" ValueChanged="Portamento_Changed"/>

@@ -153,6 +153,17 @@ public sealed class Voices {
         }
     }
 
+    /// <summary>Square pulse width per oscillator (0.01..0.99). Applies to live voices.</summary>
+    public void SetPulseWidth(float osc1Pw, float osc2Pw) {
+        for (int i = 0; i < _max_voices; i++) {
+            ref var v = ref _voices[i];
+            v.Osc1Params = new OscParams(v.Osc1Params.Wave, v.Osc1Params.Interp,
+                v.Osc1Params.DetuneCents, osc1Pw, v.Osc1Params.Level);
+            v.Osc2Params = new OscParams(v.Osc2Params.Wave, v.Osc2Params.Interp,
+                v.Osc2Params.DetuneCents, osc2Pw, v.Osc2Params.Level);
+        }
+    }
+
     public void SetFilterEnv(float attack, float decay, float sustain, float release) {
         _filter_env_params = new EnvParams(attack, decay, sustain, release);
     }

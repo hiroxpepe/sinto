@@ -235,11 +235,11 @@ public partial class MainWindow : Window
     {
         Keyboard.Children.Clear();
         _key_to_rect.Clear();
-        // 28 white keys (4 octaves: one octave below + the original three).
+        // 30 white keys (right end extended by two: C5, D5).
         const double WW = 30, WH = 78, BW = 18, BH = 48;
-        int[] white_semitones = { -12,-10,-8,-7,-5,-3,-1, 0,2,4,5,7,9,11, 12,14,16,17,19,21,23, 24,26,28,29,31,33,35 };
+        int[] white_semitones = { -12,-10,-8,-7,-5,-3,-1, 0,2,4,5,7,9,11, 12,14,16,17,19,21,23, 24,26,28,29,31,33,35, 36,38 };
         // black key sits to the right of white index i; -99 = no black key after this white.
-        int[] black_semitones = { -11,-9,-99,-6,-4,-2,-99, 1,3,-99,6,8,10,-99, 13,15,-99,18,20,22,-99, 25,27,-99,30,32,34,-99 };
+        int[] black_semitones = { -11,-9,-99,-6,-4,-2,-99, 1,3,-99,6,8,10,-99, 13,15,-99,18,20,22,-99, 25,27,-99,30,32,34,-99, 37,-99 };
 
         for (int i = 0; i < white_semitones.Length; i++)
         {
@@ -404,6 +404,8 @@ public partial class MainWindow : Window
         // Detune: slider 0-100 → -50 to +50 cents (center=50 → 0)
         int detune = (int)SldDetune.Value - 50;
         ValDetune.Text = (detune >= 0 ? "+" : "") + detune.ToString();
+        if (ValOsc1Pw != null) ValOsc1Pw.Text = ((int)SldOsc1Pw.Value).ToString();
+        if (ValOsc2Pw != null) ValOsc2Pw.Text = ((int)SldOsc2Pw.Value).ToString();
         ApplyOsc();
     }
     void ApplyOsc()
@@ -412,6 +414,9 @@ public partial class MainWindow : Window
         float l2 = (float)(SldOsc2Lvl?.Value ?? 50)  / 100f;
         float dt = (float)(SldDetune  ?.Value ?? 50) - 50f; // -50 to +50 cents
         _engine?.SetOscParams(l1, l2, dt);
+        float pw1 = (float)(SldOsc1Pw?.Value ?? 50) / 100f; // 0.01..0.99
+        float pw2 = (float)(SldOsc2Pw?.Value ?? 50) / 100f;
+        _engine?.SetPulseWidth(pw1, pw2);
     }
 
     // ── Wave selection ──────────────────────────────────────────────────
@@ -505,6 +510,16 @@ public partial class MainWindow : Window
         WaveType w1 = WaveFromSelection("osc1wave");
         WaveType w2 = WaveFromSelection("osc2wave");
         _engine?.SetOscWaves(w1, w2);
+        // PW is only meaningful for the square wave: grey out (disable) the PW
+        // slider, value and label when the oscillator's waveform isn't square.
+        bool pw1 = (w1 & WaveType.Square) != 0;
+        bool pw2 = (w2 & WaveType.Square) != 0;
+        if (SldOsc1Pw   != null) SldOsc1Pw.IsEnabled   = pw1;
+        if (ValOsc1Pw   != null) ValOsc1Pw.IsEnabled   = pw1;
+        if (Osc1PwPanel != null) Osc1PwPanel.IsEnabled = pw1;
+        if (SldOsc2Pw   != null) SldOsc2Pw.IsEnabled   = pw2;
+        if (ValOsc2Pw   != null) ValOsc2Pw.IsEnabled   = pw2;
+        if (Osc2PwPanel != null) Osc2PwPanel.IsEnabled = pw2;
     }
 
     WaveType WaveFromSelection(string group)
@@ -612,6 +627,7 @@ public partial class MainWindow : Window
     void Hpf_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
+        if (ValHpf != null) ValHpf.Text = ((int)SldHpf.Value).ToString();
         _engine?.SetHpf((float)SldHpf.Value);
         DebugLog($"HPF {(int)SldHpf.Value}");
     }
