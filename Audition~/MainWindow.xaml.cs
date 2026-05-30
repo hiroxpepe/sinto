@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     Engine? _engine;
     WasapiOut? _output;
     SignoProvider? _provider;
+    readonly ScopeBuffer _scope = new();
+    OscilloscopeWindow? _scopeWin;
     MidiIn? _midi_in;
 
     bool _loaded = false;
@@ -84,6 +86,7 @@ public partial class MainWindow : Window
         ApplyEnvelope();
 
         _provider = new SignoProvider(_engine);
+        _provider.Scope = _scope;
         // WASAPI exclusive mode for low-latency MIDI playing (no ASIO).
         // Exclusive + small latency gives ~5-15ms; fall back to shared if the
         // device refuses exclusive or the IEEE-float format is unsupported.
@@ -573,6 +576,16 @@ public partial class MainWindow : Window
     }
 
     // Portamento glide time is applied only when ON; OFF forces instant (0s).
+    void BtnScope_Click(object sender, RoutedEventArgs e)
+    {
+        if (_scopeWin == null || !_scopeWin.IsVisible) {
+            _scopeWin = new OscilloscopeWindow(_scope);
+            _scopeWin.Show();
+        } else {
+            _scopeWin.Activate();
+        }
+    }
+
     void ApplyPortamento()
     {
         float seconds = _porta_on ? (float)(SldPortamento.Value / 100.0 * 0.5) : 0f;
@@ -962,25 +975,25 @@ internal readonly struct NoteCommand
 internal sealed class SignoProvider : ISampleProvider
 {
     readonly Engine _engine;
-    // Multiple-producer safe; drained by the audio thread only.
     readonly System.Collections.Concurrent.ConcurrentQueue<NoteCommand> _notes = new();
     public WaveFormat WaveFormat { get; }
+    public ScopeBuffer? Scope { get; set; }
+
     public SignoProvider(Engine engine)
     {
         _engine = engine;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
     }
-    // Called from MIDI or UI threads; never touches the engine directly.
     public void EnqueueNote(in NoteCommand cmd) => _notes.Enqueue(cmd);
 
     public int Read(float[] buffer, int offset, int count)
     {
-        // Drain note commands first so they apply to this very block.
         while (_notes.TryDequeue(out var cmd)) {
             if (cmd.On) _engine.SendNoteOn(cmd.Midi, cmd.Velocity, 2, 5, 0);
             else        _engine.SendNoteOff(cmd.Midi, 2, 0);
         }
         _engine.ProcessAudioCallback(buffer.AsSpan(offset, count));
+        Scope?.Push(buffer, offset, count, 2);
         return count;
     }
 }

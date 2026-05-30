@@ -148,11 +148,18 @@
                 <TextBlock Text="PROGRAMMABLE SYNTHESIZER · v1.0" FontSize="9"
                            Foreground="#888888" Margin="2,2,0,0"/>
             </StackPanel>
-            <Border HorizontalAlignment="Right" VerticalAlignment="Center"
-                    Background="#0d140d" BorderBrush="#2a3a2a" BorderThickness="1"
-                    CornerRadius="6" Padding="10,6">
-                <TextBlock x:Name="DisplayText" Text="C4 · SAW · POLY" FontSize="12"/>
-            </Border>
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal">
+                <Border Background="#1a0d2a" BorderBrush="#3a2a5a" BorderThickness="1"
+                        CornerRadius="6" Padding="10,6" Margin="0,0,6,0">
+                    <Button Content="SCOPE" FontSize="9" FontFamily="Consolas"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="#c8a0e8" Cursor="Hand" Click="BtnScope_Click"/>
+                </Border>
+                <Border Background="#0d140d" BorderBrush="#2a3a2a" BorderThickness="1"
+                        CornerRadius="6" Padding="10,6">
+                    <TextBlock x:Name="DisplayText" Text="C4 · SAW · POLY" FontSize="12"/>
+                </Border>
+            </StackPanel>
         </Grid>
 
         <!-- ===== Main 7 sections ===== -->
