@@ -64,6 +64,17 @@ public sealed class Engine : IDisposable {
     /// <summary>Set the waveform used for new NoteOn events (audition / live tweaking).</summary>
     public void SetWave(WaveType wave) => _current_wave = wave;
 
+    /// <summary>Portamento glide time in seconds (applied per-voice on NoteOn).</summary>
+    public void SetPortamentoTime(float seconds) => _voices.SetPortamentoTime(seconds);
+
+    /// <summary>Test/observation: current portamento frequency of an active voice.</summary>
+    public float GetVoiceCurrentFrequency(int midiNote, int trackId)
+        => _voices.GetVoiceCurrentFrequency(midiNote, trackId);
+
+    /// <summary>Test/observation: whether an active voice is currently gliding.</summary>
+    public bool GetVoiceIsGliding(int midiNote, int trackId)
+        => _voices.GetVoiceIsGliding(midiNote, trackId);
+
     /// <summary>Set OSC levels and OSC2 detune.</summary>
     public void SetOscParams(float osc1Level, float osc2Level, float detuneCents) {
         _osc1_level   = osc1Level;

@@ -195,6 +195,32 @@ public sealed class Voices {
         return -1f;
     }
 
+    /// <summary>Test/observation: current portamento frequency of an active voice (-1 if none).</summary>
+    public float GetVoiceCurrentFrequency(int midiNote, int trackId) {
+        for (int i = 0; i < _max_voices; i++) {
+            ref var v = ref _voices[i];
+            if (v.State != PlayState.Free &&
+                v.ActiveNote.MidiNote == midiNote &&
+                v.ActiveNote.TrackId  == trackId) {
+                return v.Portamento.currentFrequency;
+            }
+        }
+        return -1f;
+    }
+
+    /// <summary>Test/observation: whether an active voice is currently gliding (false if none).</summary>
+    public bool GetVoiceIsGliding(int midiNote, int trackId) {
+        for (int i = 0; i < _max_voices; i++) {
+            ref var v = ref _voices[i];
+            if (v.State != PlayState.Free &&
+                v.ActiveNote.MidiNote == midiNote &&
+                v.ActiveNote.TrackId  == trackId) {
+                return v.Portamento.isGliding;
+            }
+        }
+        return false;
+    }
+
     public bool IsNoteActive(int midiNote, int trackId) {
         for (int i = 0; i < _max_voices; i++) {
             ref var v = ref _voices[i];

@@ -95,8 +95,16 @@ public partial class MainWindow : Window
         }
 
         BuildKeyboard();
-        HighlightWave();
         HighlightFilter();
+        RegisterAllGroupButtons(this);
+        // Initial selections.
+        SelectInitialByTag("osc1wave:saw");
+        SelectInitialByTag("osc2wave:saw");
+        SelectInitialByTag("osc1range:8");
+        SelectInitialByTag("osc2range:8");
+        SelectInitialByTag("lfowave:sine");
+        SelectInitialByTag("arpmode:up");
+        SelectInitialByTag("arponoff:off");
         UpdateDisplay();
         // Register mouse wheel events for sliders
         // Cutoff/Reso/EnvAmt use fine 0.25 step for smooth filter sweeps (Synth1-class).
@@ -108,10 +116,6 @@ public partial class MainWindow : Window
         RegisterMouseWheel(SldD,       Env_Changed,    2);
         RegisterMouseWheel(SldS,       Env_Changed,    2);
         RegisterMouseWheel(SldR,       Env_Changed,    2);
-        RegisterMouseWheel(SldFA,       FilterEnv_Changed, 2);
-        RegisterMouseWheel(SldFD,       FilterEnv_Changed, 2);
-        RegisterMouseWheel(SldFS,       FilterEnv_Changed, 2);
-        RegisterMouseWheel(SldFR,       FilterEnv_Changed, 2);
         RegisterMouseWheel(SldOsc1Lvl, Osc_Changed,    5);
         RegisterMouseWheel(SldOsc2Lvl, Osc_Changed,    5);
         RegisterMouseWheel(SldDetune,  Osc_Changed,    2);
@@ -217,10 +221,11 @@ public partial class MainWindow : Window
     {
         Keyboard.Children.Clear();
         _key_to_rect.Clear();
-        // 21 white keys (3 octaves), with black keys layered on top
+        // 28 white keys (4 octaves: one octave below + the original three).
         const double WW = 30, WH = 78, BW = 18, BH = 48;
-        int[] white_semitones = { 0,2,4,5,7,9,11, 12,14,16,17,19,21,23, 24,26,28,29,31,33,35 };
-        int[] black_semitones = { 1,3,-1,6,8,10,-1, 13,15,-1,18,20,22,-1, 25,27,-1,30,32,34,-1 };
+        int[] white_semitones = { -12,-10,-8,-7,-5,-3,-1, 0,2,4,5,7,9,11, 12,14,16,17,19,21,23, 24,26,28,29,31,33,35 };
+        // black key sits to the right of white index i; -99 = no black key after this white.
+        int[] black_semitones = { -11,-9,-99,-6,-4,-2,-99, 1,3,-99,6,8,10,-99, 13,15,-99,18,20,22,-99, 25,27,-99,30,32,34,-99 };
 
         for (int i = 0; i < white_semitones.Length; i++)
         {
@@ -245,7 +250,7 @@ public partial class MainWindow : Window
         for (int i = 0; i < black_semitones.Length; i++)
         {
             int semi = black_semitones[i];
-            if (semi < 0) continue;
+            if (semi == -99) continue;
             var rect = new Rectangle
             {
                 Width = BW, Height = BH,
@@ -330,7 +335,7 @@ public partial class MainWindow : Window
     {
         if (!_held_notes.Add(midi)) return;
         if (rect != null)
-            rect.Fill = (Brush)FindResource(IsBlackKey(midi) ? "DcoColor" : "VcfColor");
+            rect.Fill = (Brush)FindResource(IsBlackKey(midi) ? "DcoColor" : "DcfColor");
         UpdateDisplay(midi);
         DebugLog($"NOTE_ON  midi={midi,3} ({MidiName(midi),-4}) vel={velocity:F2} " +
                  $"CUTOFF={SldCutoff.Value,3:F0} RESO={SldReso.Value,3:F0} wave={_current_wave}");
@@ -396,46 +401,203 @@ public partial class MainWindow : Window
     }
 
     // ── Wave selection ──────────────────────────────────────────────────
-    void WaveBtn_Click(object sender, RoutedEventArgs e)
+    // ── Grouped button control ──────────────────────────────────────────
+    // Tag format "group:id". Exclusive groups light exactly one button.
+    // Waveform groups (osc1wave/osc2wave) allow up to TWO, FIFO: pressing a
+    // third drops the oldest. DSP is not wired for stacking yet (visual + log).
+    readonly Dictionary<string, List<Button>> _groupButtons = new();
+    readonly Dictionary<string, List<Button>> _waveSelection = new(); // osc -> ordered lit buttons
+    static readonly HashSet<string> _waveGroups = new() { "osc1wave", "osc2wave" };
+
+    void RegisterGroup(Button b)
     {
-        if (sender is Button b && b.Tag is string tag && int.TryParse(tag, out int t))
+        if (b.Tag is not string tag || !tag.Contains(':')) return;
+        string group = tag.Split(':')[0];
+        if (!_groupButtons.TryGetValue(group, out var list)) {
+            list = new List<Button>(); _groupButtons[group] = list;
+        }
+        if (!list.Contains(b)) list.Add(b);
+    }
+
+    // Lit colour per group = that section's panel colour (JP-8 rainbow).
+    // ARP / portamento light purple (Signo's own accent).
+    Color GroupLitColor(string group)
+    {
+        string key = group switch {
+            "osc1wave" or "osc2wave" or "osc1range" or "osc2range" => "DcoColor",
+            "lfowave"                                              => "LfoColor",
+            "filtmode"                                             => "DcfColor",
+            "arpmode" or "arponoff" or "portaonoff"                => "FxColor", // purple
+            _                                                      => "DcoColor",
+        };
+        return ((SolidColorBrush)FindResource(key)).Color;
+    }
+
+    void LitOn(Button b)
+    {
+        Color c = Colors.Gray;
+        if (b.Tag is string tag && tag.Contains(':')) c = GroupLitColor(tag.Split(':')[0]);
+        b.Background = new SolidColorBrush(c);
+        // Dark text on the bright panel colour for contrast.
+        b.Foreground = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x10));
+        b.Tag = b.Tag; // keep
+        b.SetValue(LitMarkerProperty, true);
+    }
+    void LitOff(Button b)
+    {
+        b.Background = new SolidColorBrush(Color.FromRgb(0x1e,0x1e,0x1e));
+        b.Foreground = new SolidColorBrush(Color.FromRgb(0x88,0x88,0x88));
+        b.SetValue(LitMarkerProperty, false);
+    }
+    static readonly DependencyProperty LitMarkerProperty =
+        DependencyProperty.RegisterAttached("LitMarker", typeof(bool), typeof(MainWindow), new PropertyMetadata(false));
+    static bool IsLit(Button b) => (bool)b.GetValue(LitMarkerProperty);
+
+    void GroupBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is string tag && tag.Contains(':'))
         {
-            WaveType w = t switch
-            {
-                0  => WaveType.Saw,
-                3  => WaveType.Square,
-                2  => WaveType.Triangle,
-                -1 => WaveType.Sine,
-                4  => WaveType.Noise,
-                _  => WaveType.Saw,
-            };
-            SetWave(w);
+            string group = tag.Split(':')[0];
+            if (_waveGroups.Contains(group)) {
+                // Up to 2, FIFO.
+                if (!_waveSelection.TryGetValue(group, out var sel)) {
+                    sel = new List<Button>(); _waveSelection[group] = sel;
+                }
+                if (sel.Contains(b)) {            // toggle off
+                    sel.Remove(b); LitOff(b);
+                } else {
+                    if (sel.Count >= 2) { var oldest = sel[0]; sel.RemoveAt(0); LitOff(oldest); }
+                    sel.Add(b); LitOn(b);
+                }
+                // DSP can't stack waveforms yet: send the most-recent OSC1 waveform
+                // as a representative so the instrument still sounds (temporary).
+                if (group == "osc1wave" && sel.Count > 0)
+                    SendRepresentativeWave(sel[sel.Count - 1]);
+            } else {
+                // Exclusive: light only this one in the group.
+                if (_groupButtons.TryGetValue(group, out var list))
+                    foreach (var btn in list) LitOff(btn);
+                LitOn(b);
+            }
+            DebugLog($"BTN {tag}");
         }
         Focus();
     }
-    void SetWave(WaveType w)
+
+    // Maps a waveform button's tag id to WaveType and sends it (temporary,
+    // single-waveform DSP). Noise covers both W and P until pink is implemented.
+    void SendRepresentativeWave(Button b)
     {
+        if (b.Tag is not string tag) return;
+        string id = tag.Contains(':') ? tag.Split(':')[1] : tag;
+        WaveType w = id switch {
+            "saw"  => WaveType.Saw,
+            "sqr"  => WaveType.Square,
+            "tri"  => WaveType.Triangle,
+            "sin"  => WaveType.Sine,
+            "w"    => WaveType.Noise,
+            "p"    => WaveType.Noise,
+            _      => WaveType.Saw,
+        };
         _current_wave = w;
         _engine?.SetWave(w);
-        HighlightWave();
         UpdateDisplay();
     }
-    void HighlightWave()
+
+    // LFO RATE/DLY sliders: update readouts (DSP routing not wired yet).
+    void LfoSld_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        Brush sel  = (Brush)FindResource("DcoColor");
-        Brush def  = new SolidColorBrush(Color.FromRgb(0x1e, 0x1e, 0x1e));
-        Brush selF = Brushes.White;
-        Brush defF = new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77));
-        WaveSaw.Background = _current_wave == WaveType.Saw      ? sel : def;
-        WaveSqr.Background = _current_wave == WaveType.Square   ? sel : def;
-        WaveTri.Background = _current_wave == WaveType.Triangle ? sel : def;
-        WaveSin.Background = _current_wave == WaveType.Sine     ? sel : def;
-        WaveNoi.Background = _current_wave == WaveType.Noise    ? sel : def;
-        WaveSaw.Foreground = _current_wave == WaveType.Saw      ? selF : defF;
-        WaveSqr.Foreground = _current_wave == WaveType.Square   ? selF : defF;
-        WaveTri.Foreground = _current_wave == WaveType.Triangle ? selF : defF;
-        WaveSin.Foreground = _current_wave == WaveType.Sine     ? selF : defF;
-        WaveNoi.Foreground = _current_wave == WaveType.Noise    ? selF : defF;
+        if (!_loaded) return;
+        if (ValLfoRate  != null) ValLfoRate.Text  = ((int)SldLfoRate.Value).ToString();
+        if (ValLfoDelay != null) ValLfoDelay.Text = ((int)SldLfoDelay.Value).ToString();
+    }
+
+    // ARP RATE slider: update readout (DSP not implemented yet).
+    void ArpRate_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_loaded) return;
+        if (ValArpRate != null) ValArpRate.Text = ((int)SldArpRate.Value).ToString();
+    }
+
+    // LFO-amount sliders (DCF/DCA). DSP routing not wired yet; update the readout.
+    void ModLfo_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_loaded) return;
+        if (ValDcfLfo != null) ValDcfLfo.Text = ((int)SldDcfLfo.Value).ToString();
+        if (ValDcaLfo != null) ValDcaLfo.Text = ((int)SldDcaLfo.Value).ToString();
+    }
+
+    void MockBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is string tag)
+        {
+            if (IsLit(b)) LitOff(b); else LitOn(b);
+            DebugLog($"MOCK {tag} (DSP not implemented yet)");
+        }
+        Focus();
+    }
+
+    // Portamento glide time. DSP (Portamento.cs) is implemented; this wires the UI.
+    void Portamento_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_loaded) return;
+        if (ValPortamento != null) ValPortamento.Text = ((int)SldPortamento.Value).ToString();
+        // 0..100 -> 0..0.5s glide. Engine applies per-voice on next NoteOn.
+        float seconds = (float)(SldPortamento.Value / 100.0 * 0.5);
+        _engine?.SetPortamentoTime(seconds);
+        DebugLog($"PORTAMENTO time={seconds:F3}s");
+    }
+
+    // F1-F5 keys: set OSC1 waveform via the same grouped (2-max FIFO) path.
+    void SetWave(WaveType w)
+    {
+        Button? target = w switch {
+            WaveType.Saw      => WaveSaw,
+            WaveType.Square   => WaveSqr,
+            WaveType.Triangle => WaveTri,
+            WaveType.Sine     => WaveSin,
+            WaveType.Noise    => WaveNoi,
+            _                 => WaveSaw,
+        };
+        if (target != null) GroupBtn_Click(target, new RoutedEventArgs());
+    }
+
+    // Walk the visual tree and register every grouped button (Tag "group:id").
+    void RegisterAllGroupButtons(DependencyObject root)
+    {
+        int n = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++) {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is Button b && b.Tag is string tag && tag.Contains(':'))
+                RegisterGroup(b);
+            RegisterAllGroupButtons(child);
+        }
+    }
+
+    // Light an initial selection in a group without toggling logic side effects.
+    void GroupSelectInitial(string group, Button b)
+    {
+        if (_waveGroups.Contains(group)) {
+            if (!_waveSelection.TryGetValue(group, out var sel)) {
+                sel = new List<Button>(); _waveSelection[group] = sel;
+            }
+            if (!sel.Contains(b)) { sel.Add(b); LitOn(b); }
+            if (group == "osc1wave") SendRepresentativeWave(b);
+        } else {
+            if (_groupButtons.TryGetValue(group, out var list))
+                foreach (var btn in list) LitOff(btn);
+            LitOn(b);
+        }
+    }
+
+    // Find a registered grouped button by its full "group:id" tag and select it.
+    void SelectInitialByTag(string fullTag)
+    {
+        string group = fullTag.Split(':')[0];
+        if (_groupButtons.TryGetValue(group, out var list)) {
+            foreach (var btn in list)
+                if (btn.Tag is string t && t == fullTag) { GroupSelectInitial(group, btn); return; }
+        }
     }
 
     // ── Filter selection ────────────────────────────────────────────────
@@ -451,7 +613,7 @@ public partial class MainWindow : Window
     }
     void HighlightFilter()
     {
-        Brush sel  = (Brush)FindResource("VcfColor");
+        Brush sel  = (Brush)FindResource("DcfColor");
         Brush def  = new SolidColorBrush(Color.FromRgb(0x1e, 0x1e, 0x1e));
         Brush selF = new SolidColorBrush(Color.FromRgb(0x1a, 0x1a, 0x1a));
         Brush defF = new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77));
@@ -496,18 +658,15 @@ public partial class MainWindow : Window
     void FilterEnv_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
-        ValFA.Text = ((int)SldFA.Value).ToString();
-        ValFD.Text = ((int)SldFD.Value).ToString();
-        ValFS.Text = ((int)SldFS.Value).ToString();
-        ValFR.Text = ((int)SldFR.Value).ToString();
         ApplyFilterEnv();
     }
     void ApplyFilterEnv()
     {
-        float a = MapEnvTime(SldFA?.Value ?? 5);
-        float d = MapEnvTime(SldFD?.Value ?? 30);
-        float s = (float)(SldFS?.Value ?? 0) / 100f;
-        float r = MapEnvTime(SldFR?.Value ?? 20);
+        // Filter-envelope ADSR sliders are not in the current UI yet; use defaults.
+        float a = MapEnvTime(5);
+        float d = MapEnvTime(30);
+        float s = 0f;
+        float r = MapEnvTime(20);
         _engine?.SetFilterEnv(a, d, s, r);
     }
 
