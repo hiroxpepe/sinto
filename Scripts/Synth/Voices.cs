@@ -61,7 +61,9 @@ public sealed class Voices {
             v.Osc2MasterLevel   = 0.5f;
             v.PitchEnvAmount    = 0f;
             v.FilterEnvAmount   = 0f;
-            v.SmoothedCutoff    = new Smoother(_filter_cutoff_base, 20f, sampleRate);
+            // Cutoff smoothing at 60Hz (~8ms settle): direct response without zipper noise.
+            // Other params stay at 20Hz where slower smoothing is inaudible.
+            v.SmoothedCutoff    = new Smoother(_filter_cutoff_base, 60f, sampleRate);
             v.SmoothedResonance = new Smoother(_filter_resonance_base, 20f, sampleRate);
             v.SmoothedAmpLevel  = new Smoother(1f, 20f, sampleRate);
             v.SmoothedPitchMod  = new Smoother(0f, 20f, sampleRate);
@@ -80,7 +82,6 @@ public sealed class Voices {
         ref var v = ref _voices[idx];
         v.Osc1MasterLevel = _osc1_level;
         v.Osc2MasterLevel = _osc2_level;
-        // Set filter base via voice's smoother
         v.SmoothedCutoff.SetTarget(_filter_cutoff_base);
         v.SmoothedResonance.SetTarget(_filter_resonance_base);
         v.NoteOn(note, osc1p, osc2p, ampP, _filter_env_params, pitchP, _portamento_time, _sample_rate);

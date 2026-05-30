@@ -460,4 +460,35 @@ public class VoicesTests
             $"High-range Δ={delta_high:F5}, low-range Δ={delta_low:F5}, ratio={ratio:F1}. " +
             "[0,1] cutoff is log-Hz: same step must produce comparable sweep speed.");
     }
+
+    // ── cutoff スムージングのダイレクト感（追従速度）─────────────────────
+    // RED: cutoff スムーザーが 20Hz だと 95%整定に ~24ms かかり、
+    //      速いノブ操作で「遅れて」感じる(実機確認済み)。
+    //      合格基準: cutoff を急変させて 10ms(441サンプル)後に目標の 95% 以上へ到達。
+    //        20Hz → 10ms で 72% → FAIL
+    //        60Hz → 10ms で 98% → PASS
+    //      Fix: Voices の SmoothedCutoff 初期化を 20f → 60f。
+
+    [Test] public void Cutoff_FastChange_ReachesTargetWithin10ms()
+    {
+        var vm = new Voices(32, 44100);
+        // 低い cutoff で発音 → NoteOn で SnapToTarget され current=0.2 に確定
+        vm.SetFilterParams(0.2f, 0.0f, FilterKind.Moog);
+        vm.NoteOn(MakeNote(60, 2), DefaultOsc(), DefaultOsc(),
+            EnvParams.Default, EnvParams.Default, EnvParams.Default);
+        float[] buf = new float[64];
+        vm.RenderSamples(buf, 1); // 少し回して安定
+        float start = vm.GetVoiceCurrentCutoff(60, 2);
+        // cutoff を 0.2 → 0.9 へ急変
+        vm.SetFilterParams(0.9f, 0.0f, FilterKind.Moog);
+        // 10ms = 441 サンプル進める
+        float[] block = new float[441];
+        vm.RenderSamples(block, 1);
+        float after = vm.GetVoiceCurrentCutoff(60, 2);
+        float reached = (after - start) / (0.9f - start); // 到達率
+        Assert.That(reached, Is.GreaterThanOrEqualTo(0.95f),
+            $"cutoff 0.2→0.9: after 10ms reached {reached*100:F0}% (current={after:F3}). " +
+            "20Hz smoothing reaches only ~72% in 10ms → feels laggy. " +
+            "Fix: SmoothedCutoff init 20f → 60f (95% settle in ~8ms).");
+    }
 }

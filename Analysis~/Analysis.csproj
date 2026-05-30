@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Filter analysis harness.
+
+    This compiles the REAL production sources (Scripts/Synth/Filter.cs etc.)
+    by linking them directly. They are NOT copied. Any change to Filter.cs is
+    automatically reflected here on the next build, so the measurements and the
+    shipped DSP can never silently diverge.
+
+    Run via the helper script run_analysis.sh (see that file for the command).
+    It sweeps the filter and writes raw measured output for visualize.py to plot.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SintoFilterAnalysis</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Link the actual production DSP sources (single source of truth). -->
+    <Compile Include="../Scripts/Synth/Filter.cs" Link="Filter.cs" />
+    <Compile Include="../Scripts/Synth/Calc.cs"   Link="Calc.cs" />
+    <Compile Include="../Scripts/Synth/Smoother.cs" Link="Smoother.cs" />
+    <Compile Include="../Scripts/Audio/Denormal.cs" Link="Denormal.cs" />
+    <!-- The harness entry point. -->
+    <Compile Include="Measure.cs" />
+  </ItemGroup>
+
+</Project>

@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NAudio.Wave;
+using NAudio.Midi;
 using Sinto.Core.Synth;
 
 namespace Sinto.Audition;
@@ -21,8 +22,9 @@ public partial class MainWindow : Window
     const int CH = 2;
 
     Engine? _engine;
-    WaveOutEvent? _output;
+    WasapiOut? _output;
     SintoProvider? _provider;
+    MidiIn? _midi_in;
 
     bool _loaded = false;
     int _octave = 4;
@@ -76,18 +78,31 @@ public partial class MainWindow : Window
         ApplyEnvelope();
 
         _provider = new SintoProvider(_engine);
-        _output = new WaveOutEvent { DesiredLatency = 50 };
-        _output.Init(_provider);
-        _output.Play();
+        // WASAPI exclusive mode for low-latency MIDI playing (no ASIO).
+        // Exclusive + small latency gives ~5-15ms; fall back to shared if the
+        // device refuses exclusive or the IEEE-float format is unsupported.
+        try {
+            _output = new WasapiOut(NAudio.CoreAudioApi.AudioClientShareMode.Exclusive, 10);
+            _output.Init(_provider);
+            _output.Play();
+            DebugLog("OUT: WASAPI exclusive, 10ms latency.");
+        } catch (Exception ex) {
+            DebugLog($"OUT: exclusive failed ({ex.Message}); using shared mode.");
+            _output?.Dispose();
+            _output = new WasapiOut(NAudio.CoreAudioApi.AudioClientShareMode.Shared, 30);
+            _output.Init(_provider);
+            _output.Play();
+        }
 
         BuildKeyboard();
         HighlightWave();
         HighlightFilter();
         UpdateDisplay();
         // Register mouse wheel events for sliders
-        RegisterMouseWheel(SldCutoff,  Filter_Changed, 2);
-        RegisterMouseWheel(SldReso,    Filter_Changed, 2);
-        RegisterMouseWheel(SldEnvAmt,  Filter_Changed, 2);
+        // Cutoff/Reso/EnvAmt use fine 0.25 step for smooth filter sweeps (Synth1-class).
+        RegisterMouseWheel(SldCutoff,  Filter_Changed, 0.25);
+        RegisterMouseWheel(SldReso,    Filter_Changed, 0.25);
+        RegisterMouseWheel(SldEnvAmt,  Filter_Changed, 0.25);
         RegisterMouseWheel(SldLevel,   Level_Changed,  5);
         RegisterMouseWheel(SldA,       Env_Changed,    2);
         RegisterMouseWheel(SldD,       Env_Changed,    2);
@@ -108,16 +123,96 @@ public partial class MainWindow : Window
         ApplyFilterEnv();
         ApplyEnvelope();
         DebugLog($"=== SINTO started. Log: {LOG_PATH} ===");
+        InitMidi();
+    }
+
+    void InitMidi()
+    {
+        // MVP: auto-connect the first available MIDI input device.
+        if (MidiIn.NumberOfDevices == 0) {
+            DebugLog("MIDI: no input device found (play with PC keys or on-screen keys).");
+            return;
+        }
+        try {
+            string name = MidiIn.DeviceInfo(0).ProductName;
+            _midi_in = new MidiIn(0);
+            _midi_in.MessageReceived += Midi_MessageReceived;
+            _midi_in.Start();
+            DebugLog($"MIDI: connected to \"{name}\" (device 0).");
+        } catch (Exception ex) {
+            DebugLog($"MIDI: failed to open device 0: {ex.Message}");
+            _midi_in = null;
+        }
+    }
+
+    // Panic: force-release every held note. Recovers from any MIDI note-off that
+    // was dropped by the driver/port (small controllers can miss note-offs during
+    // fast chords), which otherwise leaves a note ringing forever.
+    void AllNotesOff()
+    {
+        if (_engine == null) return;
+        foreach (int midi in new List<int>(_held_notes))
+            SoundOff(midi);                       // via the intermediate queue (SPSC-safe)
+        _held_notes.Clear();
+        // reset on-screen key colours
+        foreach (var kv in _key_to_rect)
+            kv.Value.Fill = IsBlackKey((_octave + 1) * 12 + kv.Key)
+                ? new SolidColorBrush(Color.FromRgb(0x1a, 0x1a, 0x1a))
+                : Brushes.WhiteSmoke;
+        DebugLog("PANIC: all notes off.");
+    }
+
+    void Midi_MessageReceived(object? sender, MidiInMessageEventArgs e)
+    {
+        // Sound is triggered on the MIDI thread immediately (lowest latency,
+        // independent of UI load). Only the visual update is marshalled to UI.
+        var ev = e.MidiEvent;
+        if (ev is NoteOnEvent on)
+        {
+            int midi = on.NoteNumber;
+            if (on.Velocity > 0) {
+                float vel = on.Velocity / 127f;
+                SoundOn(midi, vel);                                   // MIDI thread, instant
+                Dispatcher.BeginInvoke(() => NoteVisualOn(midi, FindKeyRect(midi), vel));
+            } else {
+                SoundOff(midi);                                       // vel 0 == note-off
+                Dispatcher.BeginInvoke(() => NoteVisualOff(midi, FindKeyRect(midi)));
+            }
+        }
+        else if (ev is NoteEvent off && off.CommandCode == MidiCommandCode.NoteOff)
+        {
+            int midi = off.NoteNumber;
+            SoundOff(midi);
+            Dispatcher.BeginInvoke(() => NoteVisualOff(midi, FindKeyRect(midi)));
+        }
+        else if (ev is ControlChangeEvent cc &&
+                 ((int)cc.Controller == 123 || (int)cc.Controller == 120))
+        {
+            Dispatcher.BeginInvoke(AllNotesOff);
+        }
     }
 
     void MainWindow_Closed(object? sender, EventArgs e)
     {
+        if (_midi_in != null) {
+            _midi_in.Stop();
+            _midi_in.Dispose();
+            _midi_in = null;
+        }
         _output?.Stop();
         _output?.Dispose();
         _engine?.Dispose();
     }
 
     // ── Keyboard rendering ──────────────────────────────────────────────
+    // Map an absolute MIDI note to the on-screen key rect for the current octave.
+    // Returns null if the note is outside the visible keyboard (sound still plays).
+    Rectangle? FindKeyRect(int midi)
+    {
+        int semi = midi - (_octave + 1) * 12;
+        return _key_to_rect.TryGetValue(semi, out var rect) ? rect : null;
+    }
+
     void BuildKeyboard()
     {
         Keyboard.Children.Clear();
@@ -204,6 +299,7 @@ public partial class MainWindow : Window
             case Key.OemCloseBrackets:  AdjustCutoff(+5); return;
             case Key.OemSemicolon:      AdjustReso(-5);   return;
             case Key.OemQuotes:         AdjustReso(+5);   return;
+            case Key.Escape:            AllNotesOff();    return;
         }
         if (KEY_MAP.TryGetValue(e.Key, out int semi))
         {
@@ -224,27 +320,43 @@ public partial class MainWindow : Window
         }
     }
 
-    void PressNote(int midi, Rectangle? rect)
+    // Sound path: thread-agnostic, lowest latency. Safe to call from the MIDI
+    // thread. Enqueues into the provider; the audio callback forwards to engine.
+    void SoundOn(int midi, float velocity) => _provider?.EnqueueNote(new NoteCommand(true, midi, velocity));
+    void SoundOff(int midi)                 => _provider?.EnqueueNote(new NoteCommand(false, midi, 0f));
+
+    // UI path: must run on the UI thread (touches _held_notes, key colours, log).
+    void NoteVisualOn(int midi, Rectangle? rect, float velocity)
     {
-        if (_engine == null || _held_notes.Contains(midi)) return;
-        _engine.SendNoteOn(midi, 0.8f, 2, 5, 0);
-        _held_notes.Add(midi);
+        if (!_held_notes.Add(midi)) return;
         if (rect != null)
             rect.Fill = (Brush)FindResource(IsBlackKey(midi) ? "DcoColor" : "VcfColor");
         UpdateDisplay(midi);
-        DebugLog($"NOTE_ON  midi={midi,3} ({MidiName(midi),-4}) " +
+        DebugLog($"NOTE_ON  midi={midi,3} ({MidiName(midi),-4}) vel={velocity:F2} " +
                  $"CUTOFF={SldCutoff.Value,3:F0} RESO={SldReso.Value,3:F0} wave={_current_wave}");
     }
-    void ReleaseNote(int midi, Rectangle? rect)
+    void NoteVisualOff(int midi, Rectangle? rect)
     {
-        if (_engine == null || !_held_notes.Contains(midi)) return;
-        _engine.SendNoteOff(midi, 2, 0);
-        _held_notes.Remove(midi);
+        if (!_held_notes.Remove(midi)) return;
         if (rect != null)
             rect.Fill = IsBlackKey(midi)
                 ? new SolidColorBrush(Color.FromRgb(0x1a, 0x1a, 0x1a))
                 : Brushes.WhiteSmoke;
         DebugLog($"NOTE_OFF midi={midi,3} ({MidiName(midi),-4})");
+    }
+
+    // Convenience for UI-thread callers (PC keys, on-screen keys): sound + visual.
+    void PressNote(int midi, Rectangle? rect, float velocity = 0.8f)
+    {
+        if (_engine == null || _held_notes.Contains(midi)) return;
+        SoundOn(midi, velocity);
+        NoteVisualOn(midi, rect, velocity);
+    }
+    void ReleaseNote(int midi, Rectangle? rect)
+    {
+        if (_engine == null || !_held_notes.Contains(midi)) return;
+        SoundOff(midi);
+        NoteVisualOff(midi, rect);
     }
     static bool IsBlackKey(int midi)
     {
@@ -351,9 +463,9 @@ public partial class MainWindow : Window
     void Filter_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
-        ValCutoff.Text = ((int)SldCutoff.Value).ToString();
-        ValReso.Text   = ((int)SldReso.Value).ToString();
-        ValEnvAmt.Text = ((int)SldEnvAmt.Value).ToString();
+        ValCutoff.Text = SldCutoff.Value.ToString("0.0");
+        ValReso.Text   = SldReso.Value.ToString("0.0");
+        ValEnvAmt.Text = SldEnvAmt.Value.ToString("0.0");
         ApplyFilter();
     }
     void ApplyFilter()
@@ -363,21 +475,13 @@ public partial class MainWindow : Window
         float ea = (float)(SldEnvAmt?.Value ?? 0)   / 100f;
         _engine?.SetFilterParams(c, r, _current_filter);
         _engine?.SetFilterEnvAmount(ea);
-        // Internal filter coefficients (mirror of Filter.SetParams logic)
-        const float LN1000 = 6.90775527898214f;
-        float cutoff_factor = _current_filter == FilterKind.Roland
-            ? MathF.Pow(c, 1.7f) : c;
-        float cutoff_hz = 20f * MathF.Exp(LN1000 * cutoff_factor);
-        float k         = r * 4.5f;
-        float g_raw     = 2f * MathF.PI * cutoff_hz / SR;
-        if (g_raw > 0.95f) g_raw = 0.95f;  // fixed cap only, no dynamic k-dependent cap
-        float k_g4      = k * g_raw * g_raw * g_raw * g_raw;
-        double cutoff_val = SldCutoff?.Value ?? 0;
-        double reso_val   = SldReso?.Value   ?? 0;
-        double envamt_val = SldEnvAmt?.Value ?? 0;
+        // Diagnostics come straight from Filter so the log always matches the running DSP.
+        var diag = Filter.Diagnose(c, r, _current_filter, (int)SR);
         DebugLog($"DCF mode={_current_filter,-6} " +
-                 $"CUTOFF={cutoff_val,3:F0} RESO={reso_val,3:F0} ENVAMT={envamt_val,3:F0} " +
-                 $"| cutoff_hz={cutoff_hz,6:F0} k={k:F3} g={g_raw:F4} k*g^4={k_g4:F6} (osc_threshold=4.0)");
+                 $"CUTOFF={SldCutoff?.Value ?? 0,3:F0} RESO={SldReso?.Value ?? 0,3:F0} " +
+                 $"ENVAMT={SldEnvAmt?.Value ?? 0,3:F0} " +
+                 $"| cutoff_hz={diag.cutoffHz,6:F0} p={diag.p:F4} r_norm={diag.rNorm:F3} " +
+                 $"{(diag.oscillates ? "[OSC]" : "")} (osc_threshold=RESO0.75)");
     }
     void AdjustCutoff(int delta)
     {
@@ -470,17 +574,42 @@ public partial class MainWindow : Window
 }
 
 /// <summary>NAudio bridge — converts Sinto's Span output to NAudio sample provider.</summary>
+// A note command queued from any thread (MIDI thread, UI thread). The audio
+// callback is the SINGLE consumer that forwards them to the engine, so the
+// engine's SPSC event queue keeps exactly one producer (the audio thread) and
+// notes are applied right before they are rendered = lowest, jitter-free latency.
+internal readonly struct NoteCommand
+{
+    public readonly bool On;
+    public readonly int Midi;
+    public readonly float Velocity;
+    public NoteCommand(bool on, int midi, float velocity)
+    {
+        On = on; Midi = midi; Velocity = velocity;
+    }
+}
+
 internal sealed class SintoProvider : ISampleProvider
 {
     readonly Engine _engine;
+    // Multiple-producer safe; drained by the audio thread only.
+    readonly System.Collections.Concurrent.ConcurrentQueue<NoteCommand> _notes = new();
     public WaveFormat WaveFormat { get; }
     public SintoProvider(Engine engine)
     {
         _engine = engine;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
     }
+    // Called from MIDI or UI threads; never touches the engine directly.
+    public void EnqueueNote(in NoteCommand cmd) => _notes.Enqueue(cmd);
+
     public int Read(float[] buffer, int offset, int count)
     {
+        // Drain note commands first so they apply to this very block.
+        while (_notes.TryDequeue(out var cmd)) {
+            if (cmd.On) _engine.SendNoteOn(cmd.Midi, cmd.Velocity, 2, 5, 0);
+            else        _engine.SendNoteOff(cmd.Midi, 2, 0);
+        }
         _engine.ProcessAudioCallback(buffer.AsSpan(offset, count));
         return count;
     }

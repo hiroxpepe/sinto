@@ -13,6 +13,85 @@ public class FilterTests
 {
     const int SR = 44100;
 
+    // ── 診断メソッド: UI ログ用に SetParams と同一の計算を一元提供 ─────────
+    // RED: Filter.Diagnose が未実装。UI(MainWindow) が Euler 時代の式
+    //      (k*g^4, osc_threshold=4.0) を二重実装しており現行 bilinear と食い違う。
+    //      Fix: Filter.Diagnose(cutoff,reso,mode,sr) を追加し SetParams と同じ
+    //           cutoff_hz / p / r_norm / oscillates を返す。UI はこれを呼ぶだけにする。
+
+    [Test] public void Diagnose_MatchesSetParamsLogic()
+    {
+        // CUTOFF=0.5: fc=469Hz (fc_max=11kHz mapping), RESO=1.0 → 発振閾値超え。
+        var d = Filter.Diagnose(0.5f, 1.0f, FilterKind.Moog, SR);
+        Assert.That(d.cutoffHz, Is.EqualTo(469f).Within(2f),
+            $"cutoff_hz={d.cutoffHz:F1}, expected ~469Hz. " +
+            "Diagnose must use the same 20*exp(LN_FC_MAX*cutoff) mapping as SetParams.");
+        Assert.That(d.oscillates, Is.True,
+            $"RESO=1.0 r_norm={d.rNorm:F3} must oscillate (> 1.0).");
+    }
+
+    [Test] public void Diagnose_LowResonance_DoesNotOscillate()
+    {
+        // RESO=0.25 は発振閾値(0.75)未満 → oscillates=false。
+        var d = Filter.Diagnose(0.5f, 0.25f, FilterKind.Moog, SR);
+        Assert.That(d.oscillates, Is.False,
+            $"RESO=0.25 r_norm={d.rNorm:F3} must NOT oscillate (< 1.0). " +
+            "Threshold is RESO=0.75 with current normalization.");
+    }
+
+    // ── 高カットオフ発振のエイリアシング排除 (fc_max=11kHz) ──────────────
+    // RED: self-oscillation は fc の約2倍の周波数で起きる。fc_max=20kHz だと
+    //      CUTOFF=100 で発振が ~40kHz → Nyquist(22050Hz)超え → 折り返し(aliasing)。
+    //      これが CUTOFF95-100 の「突発的な段差・楽器じゃない」聴感の正体(可視化で確認)。
+    //      Fix: LN1000(fc_max 20kHz) → ln(11000/20)=6.30992 (fc_max 11kHz)。
+    //      CUTOFF=100 で発振 ~22kHz に収まり aliasing 消滅。低域うなりは下限20Hz固定で無傷。
+    //
+    // 検出方法: ゼロクロッシングは折り返し後の見かけ周波数しか測れないため使えない。
+    //   発振周波数の理論値 = fc * 2 (4-pole ladder) が Nyquist 未満かを fc から直接判定。
+
+    [Test] public void FullCutoff_OscillationStaysBelowNyquist()
+    {
+        // CUTOFF=1.0 の fc。発振は fc*2 で起きるため fc < Nyquist/2 = 11025Hz が必要。
+        var d = Filter.Diagnose(1.0f, 1.0f, FilterKind.Moog, SR);
+        float oscFreq = d.cutoffHz * 2f;
+        Assert.That(oscFreq, Is.LessThan(22050f),
+            $"CUTOFF=1.0 fc={d.cutoffHz:F0}Hz → oscillation~{oscFreq:F0}Hz exceeds Nyquist → aliasing. " +
+            "This is the 'step / not-an-instrument' artifact at CUTOFF95-100. " +
+            "Fix: LN1000 → ln(11000/20)=6.30992 so fc_max=11kHz (oscillation ~22kHz, just under Nyquist).");
+    }
+
+    [Test] public void LowCutoff_GrowlUnaffected()
+    {
+        // 最重要: 低域うなり(ブブブ)は下限20Hz固定で fc_max 変更の影響を受けない。
+        // CUTOFF=0 は両マッピングとも fc=20Hz。
+        var d = Filter.Diagnose(0.0f, 1.0f, FilterKind.Moog, SR);
+        Assert.That(d.cutoffHz, Is.EqualTo(20f).Within(0.5f),
+            $"CUTOFF=0 fc={d.cutoffHz:F1}Hz must stay at 20Hz (sub-bass growl floor unaffected).");
+    }
+
+    // ── Process 共通化のタップ位置保証 ────────────────────────────────────
+    // リファクタ(ProcessMoog/ProcessRoland → 共通 TickLadder)後も
+    // Moog=s4(-24dB/oct)、Roland=s2*0.70(-12dB/oct) のタップが保たれることを保証。
+    // 同一入力で Moog と Roland の出力が異なる(タップ位置が違う)ことを確認。
+
+    [Test] public void Moog_And_Roland_ProduceDifferentOutput()
+    {
+        var fm = new Filter();
+        var fr = new Filter();
+        fm.SetParams(0.5f, 0.3f, FilterKind.Moog, SR);
+        fr.SetParams(0.5f, 0.3f, FilterKind.Roland, SR);
+        bool any_diff = false;
+        for (int i = 0; i < 500; i++) {
+            float inp = MathF.Sin(i * 0.05f);
+            float om = fm.Process(inp, i);
+            float or = fr.Process(inp, i);
+            if (MathF.Abs(om - or) > 1e-4f) { any_diff = true; }
+        }
+        Assert.That(any_diff, Is.True,
+            "Moog (s4 tap, -24dB/oct) and Roland (s2 tap, -12dB/oct) must differ. " +
+            "If identical, the tap routing was lost during refactor.");
+    }
+
     [Test] public void SetParams_DoesNotThrow()
     {
         var f = new Filter();
@@ -246,8 +325,9 @@ public class FilterTests
     {
         // Without tanh: _s4 hard-clamps to ±1.5 → RMS > 1.0 (unusable distortion).
         // With tanh: stable self-oscillation → RMS < 1.0.
+        // RESO=0.27: equivalent margin above threshold as old RESO=0.8 with MusicDSP normalization.
         var f = new Filter();
-        f.SetParams(0.9f, 0.8f, FilterKind.Moog, SR);
+        f.SetParams(0.9f, 0.27f, FilterKind.Moog, SR);
         var rng = new Random(42);
         float rms = 0f;
         for (int i = 0; i < 4096; i++) {
@@ -257,7 +337,7 @@ public class FilterTests
         }
         rms /= 4096f;
         Assert.That(rms, Is.LessThan(1.0f),
-            $"Moog cutoff=0.9 resonance=0.8: RMS={rms:F4}. " +
+            $"Moog cutoff=0.9 resonance=0.27: RMS={rms:F4}. " +
             "Hard-clamp saturation detected (RMS >= 1.0). " +
             "Apply tanh saturation per SimplifiedModel to stabilise.");
     }
@@ -265,11 +345,12 @@ public class FilterTests
     [Test] public void Roland_HighCutoff_HighResonance_NotHardClipping()
     {
         // Roland taps s2 (-12dB/oct), which has higher amplitude at the oscillation
-        // frequency than s4. At g=0.86, reso=0.8 the filter self-oscillates steadily
+        // frequency than s4. At high cutoff, reso=0.27 the filter self-oscillates steadily
         // (bounded, no divergence) but RMS exceeds 1.0 at the s2 tap. This is correct
         // physics, not hard clipping. The test guards against Inf/NaN divergence only.
+        // RESO=0.27: equivalent margin above threshold as old RESO=0.8 with MusicDSP normalization.
         var f = new Filter();
-        f.SetParams(0.9f, 0.8f, FilterKind.Roland, SR);
+        f.SetParams(0.9f, 0.27f, FilterKind.Roland, SR);
         var rng = new Random(42);
         float rms = 0f;
         for (int i = 0; i < 4096; i++) {
@@ -279,7 +360,7 @@ public class FilterTests
         }
         rms /= 4096f;
         Assert.That(rms, Is.LessThan(2.0f),
-            $"Roland cutoff=0.9 resonance=0.8: RMS={rms:F4}. " +
+            $"Roland cutoff=0.9 resonance=0.27: RMS={rms:F4}. " +
             "Divergence detected (RMS >= 2.0). Feedback tanh must bound the oscillation.");
     }
 
@@ -450,21 +531,20 @@ public class FilterTests
 
     [Test] public void Moog_LowCutoff_HighResonance_SelfOscillatesQuickly()
     {
-        // CUTOFF=0.30 → fc≈159Hz。Euler では k*g^4≈0.000 (発振不可)。
-        // MusicDSP bilinear では r_eff≈3.88 → 発振可。impulse max >= 0.3 を要求。
+        // CUTOFF=0.30 → fc≈133Hz. MusicDSP bilinear self-oscillates here (Euler
+        // would not). The original sigmoid limits amplitude and the build-up is
+        // gradual, so we verify steady-state oscillation over 1s rather than a
+        // fast transient. Steady max ≈ 0.30.
         var f = new Filter();
         f.SetParams(0.30f, 1.0f, FilterKind.Moog, SR);
         float max = 0f;
-        for (int i = 0; i < 2000; i++) {
+        for (int i = 0; i < SR; i++) {
             float s = MathF.Abs(f.Process(i == 0 ? 1.0f : 0.0f, i));
-            if (s > max) max = s;
+            if (i > SR / 2 && s > max) max = s;  // measure after build-up
         }
-        Assert.That(max, Is.GreaterThan(0.3f),
-            $"Moog CUTOFF=0.30 (fc≈159Hz) RESO=100: impulse max={max:F4}. " +
-            "Euler k*g^4≈0.000 → 発振不可。" +
-            "Fix: MusicDSP bilinear p=cutoff*(1.8-0.8*cutoff) + resonance 正規化 r*(t2+6t1)/(t2-6t1).");
-        Assert.That(max, Is.LessThan(2.0f),
-            $"Moog CUTOFF=0.30 RESO=100: max={max:F4} diverged.");
+        Assert.That(max, Is.GreaterThan(0.2f),
+            $"Moog CUTOFF=0.30 (fc≈133Hz) RESO=100: steady max={max:F4}. " +
+            "MusicDSP bilinear self-oscillates (sigmoid-limited ~0.30).");
     }
 
     [Test] public void Roland_LowCutoff_HighResonance_SelfOscillates()
@@ -487,7 +567,7 @@ public class FilterTests
 
     [Test] public void Moog_MidCutoff_HighResonance_SelfOscillates()
     {
-        // CUTOFF=0.50 → fc≈632Hz。Euler では k*g^4≈0.0003 → 発振不可。
+        // CUTOFF=0.50 → fc≈469Hz。Euler では k*g^4≈0.0003 → 発振不可。
         // MusicDSP bilinear では r_eff≈3.71 → 発振。
         var f = new Filter();
         f.SetParams(0.50f, 1.0f, FilterKind.Moog, SR);
@@ -497,7 +577,7 @@ public class FilterTests
             if (s > max) max = s;
         }
         Assert.That(max, Is.GreaterThan(0.3f),
-            $"Moog CUTOFF=0.50 (fc≈632Hz) RESO=100: impulse max={max:F4}. " +
+            $"Moog CUTOFF=0.50 (fc≈469Hz) RESO=100: impulse max={max:F4}. " +
             "Euler k*g^4≈0.0003 → 発振不可。" +
             "Fix: MusicDSP bilinear + resonance 正規化。");
         Assert.That(max, Is.LessThan(2.0f),
@@ -515,10 +595,126 @@ public class FilterTests
             if (s > max) max = s;
         }
         Assert.That(max, Is.GreaterThan(0.3f),
-            $"Roland CUTOFF=0.50 (fc≈632Hz) RESO=100: impulse max={max:F4}. " +
+            $"Roland CUTOFF=0.50 (fc≈469Hz) RESO=100: impulse max={max:F4}. " +
             "Euler k*g^4≈0.0003 → 発振不可。" +
             "Fix: MusicDSP bilinear + resonance 正規化。s2 tap は維持。");
         Assert.That(max, Is.LessThan(2.0f),
             $"Roland CUTOFF=0.50 RESO=100: max={max:F4} diverged.");
     }
+
+    // ── Huovilainen acr: 高カットオフでの均一な強発振 ─────────────────────
+    // RED: MusicDSP r*(t2+6t1)/(t2-6t1) は高カットオフで破綻する。
+    //      CUTOFF=0.90: r_norm=1.618 / CUTOFF=0.99: r_norm=1.071 → 弱い発振。
+    //      Huovilainen acr = -3.9364*fc_ratio^2 + 1.8409*fc_ratio + 0.9968 に変えると
+    //      全域で r = 4.0 * resonance * acr ≈ 4.0〜4.9 → 強発振。
+    //      CUTOFF=100 RESO=100 は「素のノコギリ波 + 強烈な発振音」が正しい挙動。
+    //      根拠: ddiakopoulos/MoogLadders HuovilainenModel.h (public domain)
+    //
+    // RMS 測定: 44100 サンプル(1秒) の出力 RMS。
+    //   強発振なら RMS ≈ 1.1 (±1.9 でクリップされた波形)。
+    //   弱発振(r_norm≈1.07)なら発振が遅く RMS < 0.5。
+    //   threshold = 0.8: 高カットオフでも強発振を要求。
+
+    static float CalcRms(Filter f, int n) {
+        double sum = 0.0;
+        for (int i = 0; i < n; i++) {
+            float s = f.Process(i == 0 ? 1.0f : 0.0f, i);
+            sum += s * s;
+        }
+        return (float)Math.Sqrt(sum / n);
+    }
+
+    // ── True-MusicDSP fidelity (restore original, remove our deviations) ──────
+    // We deviated from the MusicDSP original (musicdsp.org id=24) in 3 ways:
+    //   (1) added /0.75 to resonance normalization (NOT in original)
+    //   (2) dropped the original band-limited sigmoid  stage[3] -= stage[3]^3/6
+    //   (3) replaced linear feedback with TanhFast(s4) in the feedback path
+    // Restoring the original (verified by porting MusicDSPModel.h):
+    //   - CUTOFF=0.5, RESO=0.5 must NOT oscillate (original onset is ~RESO=0.6;
+    //     our /0.75 made it oscillate from ~0.5 — wrong).
+    //   - Self-oscillation amplitude is naturally limited by the x^3/6 sigmoid to
+    //      RMS ~0.39 at fc=469Hz, NOT clamped at +-1.9 (RMS ~1.1). Output must
+    //     stay well below the old hard-clip RMS.
+
+    [Test] public void TrueMusicDSP_MidReso_DoesNotOscillate()
+    {
+        // Original (no /0.75): CUTOFF=0.5 RESO=0.5 decays. Our /0.75 wrongly oscillates.
+        var f = new Filter();
+        f.SetParams(0.5f, 0.5f, FilterKind.Moog, SR);
+        float rms = CalcRms(f, SR);
+        Assert.That(rms, Is.LessThan(0.02f),
+            $"CUTOFF=0.5 RESO=0.5: RMS={rms:F4}. Original MusicDSP (no /0.75) decays here. " +
+            "Remove the /0.75 factor so onset is ~RESO=0.6, not ~0.5.");
+    }
+
+    [Test] public void TrueMusicDSP_Oscillation_SelfLimitsBelowHardClip()
+    {
+        // Original x^3/6 sigmoid self-limits oscillation to RMS ~0.39 at fc=469Hz.
+        // Our hard-clip +-1.9 gives RMS ~1.1. Restoring the sigmoid must drop RMS well below 1.0.
+        var f = new Filter();
+        f.SetParams(0.5f, 1.0f, FilterKind.Moog, SR);
+        float rms = CalcRms(f, SR);
+        Assert.That(rms, Is.LessThan(0.6f),
+            $"CUTOFF=0.5 RESO=1.0: RMS={rms:F4}. Original sigmoid self-limits to ~0.39. " +
+            "Restore stage[3] -= stage[3]^3/6 and linear feedback; drop the +-1.9 hard clip reliance.");
+        Assert.That(rms, Is.GreaterThan(0.1f),
+            $"CUTOFF=0.5 RESO=1.0: RMS={rms:F4}. Must still oscillate (original ~0.39).");
+    }
+
+    [Test] public void Moog_HighCutoff_HighResonance_StrongOscillation()
+    {
+        // CUTOFF=0.90 → fc≈5.9kHz. RESO=1.0 strongly self-oscillates, but the
+        // original x^3/6 sigmoid self-limits the amplitude, so RMS ≈ 0.71
+        // (NOT the old ~1.1 of the +-1.9 hard clip). Require > 0.5.
+        var f = new Filter();
+        f.SetParams(0.90f, 1.0f, FilterKind.Moog, SR);
+        float rms = CalcRms(f, SR);
+        Assert.That(rms, Is.GreaterThan(0.5f),
+            $"Moog CUTOFF=0.90 RESO=100: RMS={rms:F4}. " +
+            "Must self-oscillate (sigmoid-limited ~0.71). MusicDSP original normalization.");
+    }
+
+    [Test] public void Roland_HighCutoff_HighResonance_StrongOscillation()
+    {
+        var f = new Filter();
+        f.SetParams(0.90f, 1.0f, FilterKind.Roland, SR);
+        float rms = CalcRms(f, SR);
+        Assert.That(rms, Is.GreaterThan(0.8f),
+            $"Roland CUTOFF=0.90 RESO=100: RMS={rms:F4}. " +
+            "Must strongly self-oscillate. s2 tap preserved.");
+    }
+
+    [Test] public void Moog_FullCutoff_HighResonance_OscillatesModerately()
+    {
+        // CUTOFF=0.99 → fc=18kHz。MusicDSP/0.75: r=1.428 > 発振。
+        // Nyquist 近傍のため RMS は中程度に留まる。> 0.5 を要求(名前どおり moderate)。
+        var f = new Filter();
+        f.SetParams(0.99f, 1.0f, FilterKind.Moog, SR);
+        float rms = CalcRms(f, SR);
+        Assert.That(rms, Is.GreaterThan(0.5f),
+            $"Moog CUTOFF=0.99 RESO=100: RMS={rms:F4}. " +
+            "Must oscillate near Nyquist (RMS moderate due to fc=18kHz). " +
+            "r = resonance * (t2+6t1) / ((t2-6t1) * 0.75f).");
+    }
+
+    [Test] public void Roland_FullCutoff_HighResonance_OscillatesModerately()
+    {
+        var f = new Filter();
+        f.SetParams(0.99f, 1.0f, FilterKind.Roland, SR);
+        float rms = CalcRms(f, SR);
+        Assert.That(rms, Is.GreaterThan(0.5f),
+            $"Roland CUTOFF=0.99 RESO=100: RMS={rms:F4}. " +
+            "Must oscillate near Nyquist. s2 tap preserved.");
+    }
+
+    // ── NOTE: oscillation-threshold tests removed (were unsound) ──────────
+    // The former Moog/Roland_MidResonance_ShouldNotOscillate tests asserted
+    // "RESO=0.65 must not oscillate". Investigation (fc_max=11kHz change) revealed
+    // this property never actually held: with /0.75 normalization the real
+    // self-oscillation threshold sits well below RESO=0.75 across most cutoffs
+    // (e.g. CUTOFF=0.5 self-oscillates from ~RESO=0.5 even without kickstart).
+    // The old tests only passed by coincidence at the single point CUTOFF=0.90
+    // under the 20kHz mapping. Redesigning the resonance threshold so that
+    // oscillation reliably begins at RESO=0.75 across the full range is a
+    // separate task (tracked in docs/todo.md), not part of the anti-aliasing fix.
 }

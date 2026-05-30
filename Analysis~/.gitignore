@@ -1,0 +1,8 @@
+bin/
+obj/
+data/*.csv
+data/sweep_speed_*.svg
+data/honest_*.svg
+data/spectro_*.svg
+data/step_*.svg
+data/*.png
