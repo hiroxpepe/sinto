@@ -5,105 +5,120 @@ using System;
 
 namespace Signo.Core.Effects;
 
-/// <summary>Freeverb-style reverb. 4 comb filters + 2 allpass per channel.</summary>
+/// <summary>
+/// Freeverb (Jezar Wakefield) reverb: 8 comb filters + 4 allpass per channel,
+/// with a stereo spread on the right channel for a wide, natural tail.
+/// </summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public sealed class Reverb : MonoEffect {
-    static readonly int[] COMB_TUNINGS = { 1116, 1188, 1277, 1356 };
-    static readonly int[] AP_TUNINGS = { 556, 441 };
+    // Jezar's original tunings (samples @ 44.1 kHz).
+    static readonly int[] COMB = { 1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617 };
+    static readonly int[] ALLPASS = { 556, 441, 341, 225 };
+    const int STEREO_SPREAD = 23;
+    const float FIXED_GAIN = 0.015f;
+    const float SCALE_DAMP = 0.4f;
+    const float SCALE_ROOM = 0.28f;
+    const float OFFSET_ROOM = 0.7f;
 
-    readonly float[][] _comb_l;
-    readonly float[][] _comb_r;
-    readonly float[][] _ap_l;
-    readonly float[][] _ap_r;
-    readonly int[] _comb_pos;
-    readonly int[] _ap_pos;
-    readonly float[] _comb_filterstore_l;
-    readonly float[] _comb_filterstore_r;
+    readonly Comb[] _comb_l = new Comb[8];
+    readonly Comb[] _comb_r = new Comb[8];
+    readonly Allpass[] _ap_l = new Allpass[4];
+    readonly Allpass[] _ap_r = new Allpass[4];
 
-    public float roomSize { get; set; } = 0.5f;
-    public float damping  { get; set; } = 0.5f;
+    float _room = 0.5f;
+    float _damp = 0.5f;
+
+    public float roomSize { get => _room; set { _room = value; UpdateComb(); } }
+    public float damping  { get => _damp; set { _damp = value; UpdateComb(); } }
     public float mix      { get; set; } = 0.3f;
+    public float width    { get; set; } = 1f;
 
     public Reverb() {
-        _comb_l = new float[4][];
-        _comb_r = new float[4][];
+        for (int i = 0; i < 8; i++) {
+            _comb_l[i] = new Comb(COMB[i]);
+            _comb_r[i] = new Comb(COMB[i] + STEREO_SPREAD);
+        }
         for (int i = 0; i < 4; i++) {
-            _comb_l[i] = new float[COMB_TUNINGS[i]];
-            _comb_r[i] = new float[COMB_TUNINGS[i] + 23];
+            _ap_l[i] = new Allpass(ALLPASS[i]);
+            _ap_r[i] = new Allpass(ALLPASS[i] + STEREO_SPREAD);
+            _ap_l[i].feedback = 0.5f;
+            _ap_r[i].feedback = 0.5f;
         }
-        _ap_l = new float[2][];
-        _ap_r = new float[2][];
-        for (int i = 0; i < 2; i++) {
-            _ap_l[i] = new float[AP_TUNINGS[i]];
-            _ap_r[i] = new float[AP_TUNINGS[i] + 23];
+        UpdateComb();
+    }
+
+    void UpdateComb() {
+        float fb = _room * SCALE_ROOM + OFFSET_ROOM;
+        float damp = _damp * SCALE_DAMP;
+        for (int i = 0; i < 8; i++) {
+            _comb_l[i].feedback = fb; _comb_l[i].damp = damp;
+            _comb_r[i].feedback = fb; _comb_r[i].damp = damp;
         }
-        _comb_pos = new int[4];
-        _ap_pos = new int[2];
-        _comb_filterstore_l = new float[4];
-        _comb_filterstore_r = new float[4];
     }
 
     public override void Process(Span<float> buffer, int channels) {
         if (!enabled || mix <= 0f) return;
         if (channels < 1) channels = 1;
         int frames = buffer.Length / channels;
-        float feedback = 0.7f + roomSize * 0.28f;
-        float damp = damping * 0.4f;
-        float inv_damp = 1f - damp;
+        float wet1 = width * 0.5f + 0.5f;
+        float wet2 = (1f - width) * 0.5f;
         for (int f = 0; f < frames; f++) {
             int i = f * channels;
             float in_l = buffer[i];
             float in_r = channels >= 2 ? buffer[i + 1] : in_l;
-            float input = (in_l + in_r) * 0.015f;
-            // Sum comb filters
+            float input = (in_l + in_r) * FIXED_GAIN;
+
             float out_l = 0f, out_r = 0f;
-            for (int c = 0; c < 4; c++) {
-                int pos = _comb_pos[c];
-                if (pos >= _comb_l[c].Length) pos = 0;
-                float sample_l = _comb_l[c][pos];
-                _comb_filterstore_l[c] = sample_l * inv_damp + _comb_filterstore_l[c] * damp;
-                _comb_l[c][pos] = input + _comb_filterstore_l[c] * feedback;
-                out_l += sample_l;
-                if (pos >= _comb_r[c].Length) pos = 0;
-                float sample_r = _comb_r[c][pos];
-                _comb_filterstore_r[c] = sample_r * inv_damp + _comb_filterstore_r[c] * damp;
-                _comb_r[c][pos] = input + _comb_filterstore_r[c] * feedback;
-                out_r += sample_r;
-                _comb_pos[c]++;
-                if (_comb_pos[c] >= _comb_l[c].Length) _comb_pos[c] = 0;
+            for (int c = 0; c < 8; c++) {
+                out_l += _comb_l[c].Process(input);
+                out_r += _comb_r[c].Process(input);
             }
-            // Allpass
-            for (int a = 0; a < 2; a++) {
-                int pos = _ap_pos[a];
-                if (pos >= _ap_l[a].Length) pos = 0;
-                float buf_l = _ap_l[a][pos];
-                _ap_l[a][pos] = out_l + buf_l * 0.5f;
-                out_l = -out_l + buf_l;
-                if (pos >= _ap_r[a].Length) pos = 0;
-                float buf_r = _ap_r[a][pos];
-                _ap_r[a][pos] = out_r + buf_r * 0.5f;
-                out_r = -out_r + buf_r;
-                _ap_pos[a]++;
-                if (_ap_pos[a] >= _ap_l[a].Length) _ap_pos[a] = 0;
+            for (int a = 0; a < 4; a++) {
+                out_l = _ap_l[a].Process(out_l);
+                out_r = _ap_r[a].Process(out_r);
             }
-            buffer[i] = in_l * (1f - mix) + out_l * mix;
-            if (channels >= 2) buffer[i + 1] = in_r * (1f - mix) + out_r * mix;
+            float wide_l = out_l * wet1 + out_r * wet2;
+            float wide_r = out_r * wet1 + out_l * wet2;
+            buffer[i] = in_l * (1f - mix) + wide_l * mix;
+            if (channels >= 2) buffer[i + 1] = in_r * (1f - mix) + wide_r * mix;
         }
         ApplyMonoCompatibility(buffer, channels);
     }
 
     public override void Reset() {
-        for (int i = 0; i < 4; i++) {
-            Array.Clear(_comb_l[i], 0, _comb_l[i].Length);
-            Array.Clear(_comb_r[i], 0, _comb_r[i].Length);
-            _comb_filterstore_l[i] = 0f;
-            _comb_filterstore_r[i] = 0f;
-            _comb_pos[i] = 0;
+        for (int i = 0; i < 8; i++) { _comb_l[i].Reset(); _comb_r[i].Reset(); }
+        for (int i = 0; i < 4; i++) { _ap_l[i].Reset(); _ap_r[i].Reset(); }
+    }
+
+    sealed class Comb {
+        readonly float[] _buf;
+        int _pos;
+        float _store;
+        public float feedback;
+        public float damp;
+        public Comb(int size) { _buf = new float[size]; }
+        public float Process(float input) {
+            float output = _buf[_pos];
+            _store = output * (1f - damp) + _store * damp;
+            _buf[_pos] = input + _store * feedback;
+            if (++_pos >= _buf.Length) _pos = 0;
+            return output;
         }
-        for (int i = 0; i < 2; i++) {
-            Array.Clear(_ap_l[i], 0, _ap_l[i].Length);
-            Array.Clear(_ap_r[i], 0, _ap_r[i].Length);
-            _ap_pos[i] = 0;
+        public void Reset() { Array.Clear(_buf, 0, _buf.Length); _store = 0f; _pos = 0; }
+    }
+
+    sealed class Allpass {
+        readonly float[] _buf;
+        int _pos;
+        public float feedback;
+        public Allpass(int size) { _buf = new float[size]; }
+        public float Process(float input) {
+            float bufout = _buf[_pos];
+            float output = -input + bufout;
+            _buf[_pos] = input + bufout * feedback;
+            if (++_pos >= _buf.Length) _pos = 0;
+            return output;
         }
+        public void Reset() { Array.Clear(_buf, 0, _buf.Length); _pos = 0; }
     }
 }

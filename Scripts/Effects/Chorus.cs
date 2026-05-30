@@ -40,11 +40,13 @@ public sealed class Chorus : MonoEffect {
         float base_delay = _sample_rate * 0.015f;
         float depth_samples = base_delay * depth;
         for (int f = 0; f < frames; f++) {
-            float lfo_val = (float)Math.Sin(_lfo_phase);
+            float lfo_l = (float)Math.Sin(_lfo_phase);
+            // Right LFO offset by ~150 deg for a wide stereo image.
+            float lfo_r = (float)Math.Sin(_lfo_phase + 2.6);
             _lfo_phase += lfo_inc;
             if (_lfo_phase >= 2.0 * Math.PI) _lfo_phase -= 2.0 * Math.PI;
-            float delay_l_samples = base_delay + lfo_val * depth_samples;
-            float delay_r_samples = base_delay + (float)Math.Cos(_lfo_phase) * depth_samples;
+            float delay_l_samples = base_delay + lfo_l * depth_samples;
+            float delay_r_samples = base_delay + lfo_r * depth_samples;
             // Read with fractional delay (linear interpolation)
             float read_l = ReadDelay(_delay_l, delay_l_samples);
             float read_r = ReadDelay(_delay_r, delay_r_samples);

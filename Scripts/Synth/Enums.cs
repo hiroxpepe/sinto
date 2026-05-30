@@ -1,12 +1,14 @@
 // Copyright (c) STUDIO MeowToon. All rights reserved.
 // Licensed under the MIT License.
 #nullable enable
+using System;
 
 namespace Signo.Core.Synth;
 
 /// <summary>Primary oscillator waveform types.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
-public enum WaveType : byte { Sine=0, Saw=1, Triangle=2, Square=3, Noise=4 }
+[Flags]
+public enum WaveType : byte { None=0, Sine=1, Saw=2, Triangle=4, Square=8, Noise=16, Pink=32 }
 
 /// <summary>Oscillator interpolation strategies.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
@@ -22,9 +24,7 @@ public enum RetroMode : byte { Clean=0, N64=1, PS1=2 }
 
 /// <summary>Available low-frequency oscillator waveforms.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
-public enum LfoWave : byte { Sine=0, Triangle=1, Square=2, SH=3 }
-
-/// <summary>Bitmask destinations for LFO modulation routing.</summary>
+public enum LfoWave : byte { Sine=0, Triangle=1, Square=2, SH=3 }/// <summary>Bitmask destinations for LFO modulation routing.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 [System.Flags]
 public enum LfoTarget : byte {
@@ -36,3 +36,6 @@ public enum LfoTarget : byte {
     FilterCutoff = 1 << 4,
     Amp          = 1 << 5,
 }
+
+/// <summary>Arpeggiator pattern modes.</summary>
+public enum ArpMode : byte { Up=0, Down=1, UpDown=2, Random=3 }

@@ -30,6 +30,12 @@ public partial class MainWindow : Window
     int _octave = 4;
     WaveType _current_wave = WaveType.Saw;
     FilterKind _current_filter = FilterKind.Moog;
+    int _osc1_range_oct = 0;
+    int _osc2_range_oct = 0;
+    ArpMode _arp_mode = ArpMode.Up;
+    bool _arp_on = false;
+    bool _porta_on = false;
+    LfoWave _lfo_wave = LfoWave.Sine;
 
     // Debug log path: signo_debug.log in working directory
     // DebugLog is compiled only in DEBUG builds (#if DEBUG).
@@ -105,6 +111,7 @@ public partial class MainWindow : Window
         SelectInitialByTag("lfowave:sine");
         SelectInitialByTag("arpmode:up");
         SelectInitialByTag("arponoff:off");
+        SelectInitialByTag("portaonoff:off");
         UpdateDisplay();
         // Register mouse wheel events for sliders
         // Cutoff/Reso/EnvAmt use fine 0.25 step for smooth filter sweeps (Synth1-class).
@@ -126,6 +133,13 @@ public partial class MainWindow : Window
         ApplyFilter();
         ApplyFilterEnv();
         ApplyEnvelope();
+        _engine?.SetDcaLevel((float)(SldLevel.Value / 100.0));
+        _engine?.SetHpf((float)SldHpf.Value);
+        ApplyLfoRouting();
+        ApplyPortamento();
+        _engine?.SetArpRate(40f + (float)(SldArpRate.Value / 100.0) * 200f);
+        UpdateAllKnobVisuals();
+        ApplyFx();
         DebugLog($"=== SIGNO started. Log: {LOG_PATH} ===");
         InitMidi();
     }
@@ -469,62 +483,244 @@ public partial class MainWindow : Window
                     if (sel.Count >= 2) { var oldest = sel[0]; sel.RemoveAt(0); LitOff(oldest); }
                     sel.Add(b); LitOn(b);
                 }
-                // DSP can't stack waveforms yet: send the most-recent OSC1 waveform
-                // as a representative so the instrument still sounds (temporary).
-                if (group == "osc1wave" && sel.Count > 0)
-                    SendRepresentativeWave(sel[sel.Count - 1]);
             } else {
                 // Exclusive: light only this one in the group.
                 if (_groupButtons.TryGetValue(group, out var list))
                     foreach (var btn in list) LitOff(btn);
                 LitOn(b);
+                ApplyExclusiveGroupToDsp(group, tag);
             }
+            // Waveform groups: rebuild the per-oscillator [Flags] stack and send.
+            if (group == "osc1wave" || group == "osc2wave")
+                ApplyWaveformsToDsp();
             DebugLog($"BTN {tag}");
         }
         Focus();
     }
 
-    // Maps a waveform button's tag id to WaveType and sends it (temporary,
-    // single-waveform DSP). Noise covers both W and P until pink is implemented.
-    void SendRepresentativeWave(Button b)
+    // Combine the lit waveform buttons of each oscillator into a [Flags] value
+    // and send to the engine (W = white noise, P = pink).
+    void ApplyWaveformsToDsp()
     {
-        if (b.Tag is not string tag) return;
+        WaveType w1 = WaveFromSelection("osc1wave");
+        WaveType w2 = WaveFromSelection("osc2wave");
+        _engine?.SetOscWaves(w1, w2);
+    }
+
+    WaveType WaveFromSelection(string group)
+    {
+        WaveType w = WaveType.None;
+        if (_waveSelection.TryGetValue(group, out var sel)) {
+            foreach (var b in sel) {
+                if (b.Tag is string t && t.Contains(':')) {
+                    w |= t.Split(':')[1] switch {
+                        "saw" => WaveType.Saw,
+                        "sqr" => WaveType.Square,
+                        "tri" => WaveType.Triangle,
+                        "sin" => WaveType.Sine,
+                        "w"   => WaveType.Noise,
+                        "p"   => WaveType.Pink,
+                        _     => WaveType.None,
+                    };
+                }
+            }
+        }
+        return w == WaveType.None ? WaveType.Saw : w;
+    }
+
+    // Exclusive groups that drive DSP directly (ranges; arp/porta handled elsewhere).
+    void ApplyExclusiveGroupToDsp(string group, string tag)
+    {
         string id = tag.Contains(':') ? tag.Split(':')[1] : tag;
-        WaveType w = id switch {
-            "saw"  => WaveType.Saw,
-            "sqr"  => WaveType.Square,
-            "tri"  => WaveType.Triangle,
-            "sin"  => WaveType.Sine,
-            "w"    => WaveType.Noise,
-            "p"    => WaveType.Noise,
-            _      => WaveType.Saw,
-        };
-        _current_wave = w;
-        _engine?.SetWave(w);
-        UpdateDisplay();
+        if (group == "osc1range" || group == "osc2range") {
+            int oct = id switch { "16" => -1, "8" => 0, "4" => 1, _ => 0 };
+            if (group == "osc1range") _osc1_range_oct = oct; else _osc2_range_oct = oct;
+            _engine?.SetOscRange(_osc1_range_oct, _osc2_range_oct);
+        } else if (group == "lfowave") {
+            LfoWave w = id switch {
+                "sine" => LfoWave.Sine, "tri" => LfoWave.Triangle,
+                "square" => LfoWave.Square, "sh" => LfoWave.SH, _ => LfoWave.Sine };
+            _lfo_wave = w;
+            _engine?.SetLfoWave(w);
+            UpdateLfoRateDisplay();
+        } else if (group == "arpmode") {
+            _arp_mode = id switch {
+                "up" => ArpMode.Up, "down" => ArpMode.Down,
+                "updn" => ArpMode.UpDown, "rnd" => ArpMode.Random, _ => ArpMode.Up };
+            _engine?.SetArpMode(_arp_mode);
+        } else if (group == "arponoff") {
+            _arp_on = id == "on";
+            _engine?.SetArpEnabled(_arp_on);
+        } else if (group == "portaonoff") {
+            _porta_on = id == "on";
+            ApplyPortamento();
+        }
+    }
+
+    // Portamento glide time is applied only when ON; OFF forces instant (0s).
+    void ApplyPortamento()
+    {
+        float seconds = _porta_on ? (float)(SldPortamento.Value / 100.0 * 0.5) : 0f;
+        _engine?.SetPortamentoTime(seconds);
+        DebugLog($"PORTAMENTO on={_porta_on} time={seconds:F3}s");
     }
 
     // LFO RATE/DLY sliders: update readouts (DSP routing not wired yet).
     void LfoSld_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
-        if (ValLfoRate  != null) ValLfoRate.Text  = ((int)SldLfoRate.Value).ToString();
+        UpdateLfoRateDisplay();
         if (ValLfoDelay != null) ValLfoDelay.Text = ((int)SldLfoDelay.Value).ToString();
+        ApplyLfoRouting();
     }
 
-    // ARP RATE slider: update readout (DSP not implemented yet).
+    // LFO RATE readout: for S&H show BPM (label "BPM", value 40..240) since its
+    // stepped nature is clock-like; for continuous shapes show the raw rate.
+    void UpdateLfoRateDisplay()
+    {
+        if (ValLfoRate == null) return;
+        if (_lfo_wave == LfoWave.SH) {
+            if (LblLfoRate != null) LblLfoRate.Text = "BPM";
+            int bpm = (int)(40f + (float)(SldLfoRate.Value / 100.0) * 200f);
+            ValLfoRate.Text = bpm.ToString();
+        } else {
+            if (LblLfoRate != null) LblLfoRate.Text = "RATE";
+            ValLfoRate.Text = ((int)SldLfoRate.Value).ToString();
+        }
+    }
+
+    // ARP RATE slider: update readout.
     void ArpRate_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
-        if (ValArpRate != null) ValArpRate.Text = ((int)SldArpRate.Value).ToString();
+        // 0..100 -> 40..240 BPM
+        float bpm = 40f + (float)(SldArpRate.Value / 100.0) * 200f;
+        if (ValArpRate != null) ValArpRate.Text = ((int)bpm).ToString();
+        _engine?.SetArpRate(bpm);
     }
 
-    // LFO-amount sliders (DCF/DCA). DSP routing not wired yet; update the readout.
+    // LFO-amount sliders (DCF/DCA): readout + route to engine.
     void ModLfo_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
         if (ValDcfLfo != null) ValDcfLfo.Text = ((int)SldDcfLfo.Value).ToString();
         if (ValDcaLfo != null) ValDcaLfo.Text = ((int)SldDcaLfo.Value).ToString();
+        ApplyLfoRouting();
+    }
+
+    // HPF frequency 0..100 -> Engine.SetHpf.
+    void Hpf_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_loaded) return;
+        _engine?.SetHpf((float)SldHpf.Value);
+        DebugLog($"HPF {(int)SldHpf.Value}");
+    }
+
+    // ── FX rotary knobs (BOSS-style, drag to turn) ─────────────────────
+    readonly Dictionary<string, double> _fx_knob = new() {
+        ["ch:send"]=0, ["ch:rate"]=50, ["ch:depth"]=50,
+        ["dl:send"]=0, ["dl:time"]=50, ["dl:fb"]=45,
+        ["rv:send"]=0, ["rv:size"]=50, ["rv:damp"]=50,
+    };
+    bool _chorus_on, _delay_on, _reverb_on;
+    string? _drag_knob;
+    double _drag_start_y, _drag_start_val;
+
+    void Knob_Down(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.Tag is string tag) {
+            _drag_knob = tag;
+            _drag_start_y = e.GetPosition(this).Y;
+            _drag_start_val = _fx_knob.TryGetValue(tag, out var v) ? v : 0;
+            fe.CaptureMouse();
+        }
+    }
+
+    void Knob_Move(object sender, MouseEventArgs e)
+    {
+        if (_drag_knob == null || e.LeftButton != MouseButtonState.Pressed) return;
+        double dy = _drag_start_y - e.GetPosition(this).Y; // up = increase
+        double val = _drag_start_val + dy; // 1px = 1 unit
+        if (val < 0) val = 0; else if (val > 100) val = 100;
+        _fx_knob[_drag_knob] = val;
+        UpdateKnobVisual(_drag_knob);
+        ApplyFx();
+    }
+
+    void Knob_Up(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe) fe.ReleaseMouseCapture();
+        _drag_knob = null;
+    }
+
+    // Rotate the indicator: 0..100 -> -135°..+135°.
+    void UpdateKnobVisual(string tag)
+    {
+        double angle = -135 + (_fx_knob[tag] / 100.0) * 270.0;
+        RotateTransform? rot = tag switch {
+            "ch:send" => RotChSend, "ch:rate" => RotChRate, "ch:depth" => RotChDepth,
+            "dl:send" => RotDlSend, "dl:time" => RotDlTime, "dl:fb" => RotDlFb,
+            "rv:send" => RotRvSend, "rv:size" => RotRvSize, "rv:damp" => RotRvDamp,
+            _ => null,
+        };
+        if (rot != null) rot.Angle = angle;
+    }
+
+    void UpdateAllKnobVisuals()
+    {
+        foreach (var k in _fx_knob.Keys) UpdateKnobVisual(k);
+    }
+
+    // FX foot switch: toggle the pedal on/off (lit ring = on).
+    void Foot_Down(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Ellipse el && el.Tag is string tag) {
+            bool on;
+            if (tag == "chorus") { _chorus_on = !_chorus_on; on = _chorus_on; }
+            else if (tag == "delay") { _delay_on = !_delay_on; on = _delay_on; }
+            else { _reverb_on = !_reverb_on; on = _reverb_on; }
+            el.Fill = new SolidColorBrush(on ? Color.FromRgb(0xc8,0xff,0x88) : Color.FromRgb(0x1a,0x1a,0x2a));
+            ApplyFx();
+            DebugLog($"FX {tag} {(on ? "on" : "off")}");
+        }
+    }
+
+    // Apply all FX sends/params to the engine (gated by each pedal's on state).
+    // Ranges are musical and centred: knob at 50 gives a usable default.
+    void ApplyFx()
+    {
+        if (!_loaded || _engine == null) return;
+        _engine.SetChorusSend(_chorus_on ? (float)(_fx_knob["ch:send"] / 100.0) : 0f);
+        _engine.SetDelaySend (_delay_on  ? (float)(_fx_knob["dl:send"] / 100.0) : 0f);
+        _engine.SetReverbSend(_reverb_on ? (float)(_fx_knob["rv:send"] / 100.0) : 0f);
+
+        // CHORUS RATE: 0.1..2.0 Hz, log (centre ~0.45 Hz). DEPTH: 0..0.7 linear (centre 0.35).
+        _engine.SetChorusParams(LogMap(_fx_knob["ch:rate"], 0.1f, 2.0f),
+                                (float)(_fx_knob["ch:depth"] / 100.0) * 0.7f);
+        // DELAY TIME: 60..600 ms, log (centre ~190 ms). F.B: 0..0.85 linear (centre ~0.43).
+        _engine.SetDelayParams(LogMap(_fx_knob["dl:time"], 0.06f, 0.6f),
+                               (float)(_fx_knob["dl:fb"] / 100.0) * 0.85f);
+        // REVERB SIZE: 0.3..0.95 linear (centre ~0.63). DAMP: 0..0.8 linear (centre 0.4).
+        _engine.SetReverbParams(0.3f + (float)(_fx_knob["rv:size"] / 100.0) * 0.65f,
+                                (float)(_fx_knob["rv:damp"] / 100.0) * 0.8f);
+    }
+
+    // Logarithmic map of a 0..100 knob to [min,max] so the knob centre lands on
+    // the geometric mean (musically even across the range).
+    static float LogMap(double knob0to100, float min, float max)
+    {
+        double t = knob0to100 / 100.0;
+        return (float)(min * System.Math.Pow(max / min, t));
+    }
+
+    // Map LFO RATE slider (0..100) to ~0.1..20 Hz and route DCF/DCA depths.
+    void ApplyLfoRouting()
+    {
+        float rateHz = 0.1f + (float)(SldLfoRate.Value / 100.0) * 19.9f;
+        float dcfDepth = (float)(SldDcfLfo.Value / 100.0);
+        float dcaDepth = (float)(SldDcaLfo.Value / 100.0);
+        _engine?.SetLfoToCutoff(dcfDepth, rateHz);
+        _engine?.SetLfoToAmp(dcaDepth, rateHz);
     }
 
     void MockBtn_Click(object sender, RoutedEventArgs e)
@@ -542,10 +738,7 @@ public partial class MainWindow : Window
     {
         if (!_loaded) return;
         if (ValPortamento != null) ValPortamento.Text = ((int)SldPortamento.Value).ToString();
-        // 0..100 -> 0..0.5s glide. Engine applies per-voice on next NoteOn.
-        float seconds = (float)(SldPortamento.Value / 100.0 * 0.5);
-        _engine?.SetPortamentoTime(seconds);
-        DebugLog($"PORTAMENTO time={seconds:F3}s");
+        ApplyPortamento(); // honours ON/OFF
     }
 
     // F1-F5 keys: set OSC1 waveform via the same grouped (2-max FIFO) path.
@@ -582,11 +775,12 @@ public partial class MainWindow : Window
                 sel = new List<Button>(); _waveSelection[group] = sel;
             }
             if (!sel.Contains(b)) { sel.Add(b); LitOn(b); }
-            if (group == "osc1wave") SendRepresentativeWave(b);
+            ApplyWaveformsToDsp();
         } else {
             if (_groupButtons.TryGetValue(group, out var list))
                 foreach (var btn in list) LitOff(btn);
             LitOn(b);
+            if (b.Tag is string t) ApplyExclusiveGroupToDsp(group, t);
         }
     }
 
@@ -675,7 +869,8 @@ public partial class MainWindow : Window
     {
         if (!_loaded) return;
         ValLevel.Text = ((int)SldLevel.Value).ToString();
-        // VCA level not yet wired to Engine (placeholder for β version)
+        _engine?.SetDcaLevel((float)(SldLevel.Value / 100.0));
+        DebugLog($"DCA level={(int)SldLevel.Value}");
     }
 
     // ── Envelope ────────────────────────────────────────────────────────

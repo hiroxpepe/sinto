@@ -20,6 +20,10 @@ public sealed class Voices {
     float _osc1_level = 1.0f;
     float _osc2_level = 0.5f;
     float _detune_cents = 0f;
+    int   _osc1_octave = 0;
+    int   _osc2_octave = 0;
+    float _hpf_cutoff_hz = 0f;
+    float _dca_level = 1.0f;
     float _filter_env_amount;
     EnvParams _filter_env_params = new EnvParams(0.01f, 0.3f, 0f, 0.2f);
     LfoParams _lfo1_params;
@@ -59,6 +63,7 @@ public sealed class Voices {
             v.VoiceIndex        = i;
             v.Osc1MasterLevel   = 1.0f;
             v.Osc2MasterLevel   = 0.5f;
+            v.DcaLevel          = 1.0f;
             v.PitchEnvAmount    = 0f;
             v.FilterEnvAmount   = 0f;
             // Cutoff smoothing at 60Hz (~8ms settle): direct response without zipper noise.
@@ -82,9 +87,14 @@ public sealed class Voices {
         ref var v = ref _voices[idx];
         v.Osc1MasterLevel = _osc1_level;
         v.Osc2MasterLevel = _osc2_level;
+        v.Osc1Octave = _osc1_octave;
+        v.Osc2Octave = _osc2_octave;
+        v.Hpf.SetCutoff(_hpf_cutoff_hz, _sample_rate);
+        v.Hpf.Reset();
         v.SmoothedCutoff.SetTarget(_filter_cutoff_base);
         v.SmoothedResonance.SetTarget(_filter_resonance_base);
         v.NoteOn(note, osc1p, osc2p, ampP, _filter_env_params, pitchP, _portamento_time, _sample_rate);
+        v.DcaLevel = _dca_level; // after NoteOn so the managed value wins over the fallback
     }
 
     public void NoteOff(int midiNote, int trackId) {
@@ -195,6 +205,19 @@ public sealed class Voices {
         return -1f;
     }
 
+    /// <summary>Test/observation: cutoff after env + LFO modulation (effective).</summary>
+    public float GetVoiceEffectiveCutoff(int midiNote, int trackId) {
+        for (int i = 0; i < _max_voices; i++) {
+            ref var v = ref _voices[i];
+            if (v.State != PlayState.Free &&
+                v.ActiveNote.MidiNote == midiNote &&
+                v.ActiveNote.TrackId  == trackId) {
+                return v.effectiveCutoff;
+            }
+        }
+        return -1f;
+    }
+
     /// <summary>Test/observation: current portamento frequency of an active voice (-1 if none).</summary>
     public float GetVoiceCurrentFrequency(int midiNote, int trackId) {
         for (int i = 0; i < _max_voices; i++) {
@@ -203,6 +226,67 @@ public sealed class Voices {
                 v.ActiveNote.MidiNote == midiNote &&
                 v.ActiveNote.TrackId  == trackId) {
                 return v.Portamento.currentFrequency;
+            }
+        }
+        return -1f;
+    }
+
+    /// <summary>Per-oscillator octave (range): -1 = 16', 0 = 8', +1 = 4'.</summary>
+    public void SetOscRange(int osc1Octave, int osc2Octave) {
+        _osc1_octave = osc1Octave;
+        _osc2_octave = osc2Octave;
+        for (int i = 0; i < _max_voices; i++) {
+            _voices[i].Osc1Octave = osc1Octave;
+            _voices[i].Osc2Octave = osc2Octave;
+        }
+    }
+
+    /// <summary>HPF cutoff in Hz (0 = off). Applied to all voices.</summary>
+    public void SetHpfCutoff(float cutoffHz) {
+        _hpf_cutoff_hz = cutoffHz;
+        for (int i = 0; i < _max_voices; i++)
+            _voices[i].Hpf.SetCutoff(cutoffHz, _sample_rate);
+    }
+
+    /// <summary>DCA master output level 0..1. Applied to all voices immediately.</summary>
+    public void SetDcaLevel(float level) {
+        _dca_level = level < 0f ? 0f : (level > 1f ? 1f : level);
+        for (int i = 0; i < _max_voices; i++)
+            _voices[i].DcaLevel = _dca_level;
+    }
+
+    /// <summary>Route LFO1 to filter cutoff with the given depth (0..1) and rate (Hz).</summary>
+    public void SetLfoToCutoff(float depth, float rateHz) {
+        _lfo1_params = new LfoParams(_lfo1_params.Wave, rateHz, depth,
+            _lfo1_params.TempoSync, LfoTarget.FilterCutoff);
+        _lfo1.Initialize(_lfo1_params, _sample_rate, _current_bpm);
+    }
+
+    /// <summary>Route LFO2 to amplitude with the given depth (0..1) and rate (Hz).</summary>
+    public void SetLfoToAmp(float depth, float rateHz) {
+        _lfo2_params = new LfoParams(_lfo2_params.Wave, rateHz, depth,
+            _lfo2_params.TempoSync, LfoTarget.Amp);
+        _lfo2.Initialize(_lfo2_params, _sample_rate, _current_bpm);
+    }
+
+    /// <summary>LFO waveform shape (applied to both LFO1 and LFO2).</summary>
+    public void SetLfoWave(LfoWave wave) {
+        _lfo1_params = new LfoParams(wave, _lfo1_params.RateOrSync, _lfo1_params.Depth,
+            _lfo1_params.TempoSync, _lfo1_params.Destinations);
+        _lfo2_params = new LfoParams(wave, _lfo2_params.RateOrSync, _lfo2_params.Depth,
+            _lfo2_params.TempoSync, _lfo2_params.Destinations);
+        _lfo1.Initialize(_lfo1_params, _sample_rate, _current_bpm);
+        _lfo2.Initialize(_lfo2_params, _sample_rate, _current_bpm);
+    }
+
+    /// <summary>Test/observation: effective oscillator frequency (oscIndex 0 or 1; -1 if none).</summary>
+    public float GetVoiceOscFrequency(int midiNote, int trackId, int oscIndex) {
+        for (int i = 0; i < _max_voices; i++) {
+            ref var v = ref _voices[i];
+            if (v.State != PlayState.Free &&
+                v.ActiveNote.MidiNote == midiNote &&
+                v.ActiveNote.TrackId  == trackId) {
+                return oscIndex == 0 ? v.currentOsc1Frequency : v.currentOsc2Frequency;
             }
         }
         return -1f;
