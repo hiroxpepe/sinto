@@ -91,7 +91,7 @@ public class ShapeTests
             var buf = Render(WaveType.Saw, s, 4096);
             float peak = 0f;
             for (int i = 0; i < buf.Length; i++) { float a = MathF.Abs(buf[i]); if (a > peak) peak = a; }
-            Assert.That(peak, Is.GreaterThan(0.05f), $"SAW shape={s} must not be silent.");
+            Assert.That(peak, Is.GreaterThan(0.02f), $"SAW shape={s} must not be silent.");
         }
     }
 

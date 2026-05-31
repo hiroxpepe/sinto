@@ -9,7 +9,7 @@ namespace Signo.Core.Synth;
 /// <summary>Fast DSP math: SinFast / TanhFast / PitchRatioFast.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public static class Calc {
-    public const int LUT_SIZE = 4096;
+    public const int LUT_SIZE = 65536;  // 4096->65536: error 0.001->0.00001
     const float TWO_PI = 6.28318530717958647692f;
     const float INV_TWO_PI = 0.15915494309189534f;
     const float LN2_DIV_12 = 0.05776226504666215f; // ln(2)/12
