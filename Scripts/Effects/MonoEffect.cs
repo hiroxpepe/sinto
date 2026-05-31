@@ -10,7 +10,7 @@ namespace Signo.Core.Effects;
 /// <author>h.adachi (STUDIO MeowToon)</author>
 public abstract class MonoEffect : IEffect {
     public bool monoCompatible { get; set; }
-    public bool enabled        { get; set; }
+    public bool enabled        { get; set; } = true;
     public abstract void Process(Span<float> buffer, int channels);
     public abstract void Reset();
 

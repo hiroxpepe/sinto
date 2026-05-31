@@ -11,6 +11,7 @@ using System.Windows.Shapes;
 using NAudio.Wave;
 using NAudio.Midi;
 using Signo.Core.Synth;
+using Signo.Core.Effects;
 
 namespace Signo.Audition;
 
@@ -611,6 +612,348 @@ public partial class MainWindow : Window
         }
     }
 
+    // Current chorus slot mode (CHR/FLG/PHS).
+    ChorusType _fx_chr_type = ChorusType.Chorus;
+
+    // MOD selector: CHR/FLG/PHS/TRM/VIB/WAH
+    string _modType = "chr"; // current MOD selection
+
+    // Active pedal colours for MOD selector button (bg, fg)
+    static (string bg, string fg) ModColor(string mod) => mod switch {
+        "chr" => ("#2d89b7", "#09212d"),
+        "flg" => ("#b72d7e", "#2d091e"),
+        "phs" => ("#5bb72d", "#152d09"),
+        "trm" => ("#2db7b7", "#092d2d"),
+        "vib" => ("#2d44b7", "#090f2d"),
+        "wah" => ("#b7392d", "#2d0c09"),
+        _     => ("#2d89b7", "#09212d"),
+    };
+
+    void ModSel_Click(object sender, MouseButtonEventArgs e)
+    {
+        DependencyObject? el = e.OriginalSource as DependencyObject;
+        string tag = "";
+        while (el != null) {
+            if (el is FrameworkElement fe && fe.Tag is string t && t.Length > 0) { tag = t; break; }
+            el = System.Windows.Media.VisualTreeHelper.GetParent(el);
+        }
+        if (tag.Length == 0) return;
+        _modType = tag;
+        _fx_chr_type = tag switch {
+            "flg" => ChorusType.Flanger,
+            "phs" => ChorusType.Phaser,
+            "trm" => ChorusType.Tremolo,
+            "vib" => ChorusType.Vibrato,
+            "wah" => ChorusType.AutoWah,
+            _     => ChorusType.Chorus,
+        };
+        _engine?.SetChorusType(_fx_chr_type);
+        UpdateModSelectorUI();
+        UpdateChrPedalUI();
+        ApplyFx();
+    }
+
+    void UpdateModSelectorUI()
+    {
+        var btns = new (string, Border?)[] {
+            ("chr", BtnModChr), ("flg", BtnModFlg), ("phs", BtnModPhs),
+            ("trm", BtnModTrm), ("vib", BtnModVib), ("wah", BtnModWah),
+        };
+        foreach (var (key, btn) in btns) {
+            if (btn == null) continue;
+            if (key == _modType) {
+                var (bg, fg) = ModColor(key);
+                btn.Background   = new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg));
+                btn.BorderBrush  = new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg));
+                if (btn.Child is TextBlock tb) { tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fg)); }
+            } else {
+                btn.Background   = new SolidColorBrush(Colors.Transparent);
+                btn.BorderBrush  = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#555566"));
+                if (btn.Child is TextBlock tb) { tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888899")); }
+            }
+        }
+    }
+    bool _dl_bpm_sync  = false;
+    bool _chr_bpm_sync = false;
+    bool _chr_sqr      = false;   // Gate Flanger / Gate Phaser (Square LFO)
+    NoteValue _fx_note = NoteValue.DottedEighth;   // MOD BPM note
+    NoteValue _dl_note = NoteValue.DottedEighth;   // DELAY BPM note (independent)
+    float _arp_bpm = 120f;
+
+    void FxMode_Click(object sender, MouseButtonEventArgs e)
+    {
+        // Walk up the visual tree to find the Border with the mode tag.
+        DependencyObject? el = e.OriginalSource as DependencyObject;
+        string tag = "";
+        while (el != null) {
+            if (el is FrameworkElement fe && fe.Tag is string t && t.Length > 0) {
+                tag = t; break;
+            }
+            el = System.Windows.Media.VisualTreeHelper.GetParent(el);
+        }
+        _fx_chr_type = tag switch {
+            "flg" => ChorusType.Flanger,
+            "phs" => ChorusType.Phaser,
+            _     => ChorusType.Chorus,
+        };
+        _engine?.SetChorusType(_fx_chr_type);
+        UpdateChrPedalUI();
+        ApplyFx();
+    }
+
+    void UpdateChrPedalUI()
+    {
+        if (PedalChr == null) return;
+        string bg, border, text;
+        string typeName;
+        string rateLbl, depthLbl;
+        switch (_fx_chr_type) {
+            case ChorusType.Flanger:
+                bg="#2d091e"; border="#b72d7e"; text="#ea8cc3";
+                typeName="FLANGER"; rateLbl="RATE"; depthLbl="DPTH";
+                break;
+            case ChorusType.Phaser:
+                bg="#152d09"; border="#5bb72d"; text="#acea8c";
+                typeName="PHASER"; rateLbl="RATE"; depthLbl="RES";
+                break;
+            case ChorusType.Tremolo:
+                bg="#092d2d"; border="#2db7b7"; text="#8ceaea";
+                typeName="TREMOLO"; rateLbl="RATE"; depthLbl="DPTH";
+                break;
+            case ChorusType.Vibrato:
+                bg="#090f2d"; border="#2d44b7"; text="#8c9cea";
+                typeName="VIBRATO"; rateLbl="RATE"; depthLbl="DPTH";
+                break;
+            case ChorusType.AutoWah:
+                bg="#2d0c09"; border="#b7392d"; text="#ea948c";
+                typeName="AUTO WAH"; rateLbl="SENS"; depthLbl="PEAK";
+                break;
+            default: // Chorus
+                bg="#09212d"; border="#2d89b7"; text="#8ccbea";
+                typeName="CHORUS"; rateLbl="RATE"; depthLbl="DPTH";
+                break;
+        }
+        var bgBrush     = new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg));
+        var borderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(border));
+        var textBrush   = new SolidColorBrush((Color)ColorConverter.ConvertFromString(text));
+        PedalChr.Background  = bgBrush;
+        PedalChr.BorderBrush = borderBrush;
+        if (LblChrType  != null) { LblChrType.Text = typeName; LblChrType.Foreground = borderBrush; }
+        if (LblChrSend  != null) { LblChrSend.Foreground  = borderBrush; }
+        if (LblChrRate  != null) { LblChrRate.Text = rateLbl;   LblChrRate.Foreground  = borderBrush; }
+        if (LblChrDepth != null) { LblChrDepth.Text = depthLbl; LblChrDepth.Foreground = borderBrush; }
+        if (ValChSend   != null) ValChSend.Foreground  = textBrush;
+        if (ValChRate   != null) ValChRate.Foreground  = textBrush;
+        if (ValChDepth  != null) ValChDepth.Foreground = textBrush;
+        // Knob colours — update stroke and needle fill
+        if (KnobChrLevelBg != null) { KnobChrLevelBg.Stroke = borderBrush; KnobChrLevelBg.Fill = bgBrush; }
+        if (KnobChrRateBg  != null) { KnobChrRateBg.Stroke  = borderBrush; KnobChrRateBg.Fill  = bgBrush; }
+        if (KnobChrDepthBg != null) { KnobChrDepthBg.Stroke = borderBrush; KnobChrDepthBg.Fill = bgBrush; }
+        if (NeedleChSend   != null) NeedleChSend.Fill = textBrush;
+        if (NeedleChRate   != null) NeedleChRate.Fill = textBrush;
+        if (NeedleChDepth  != null) NeedleChDepth.Fill = textBrush;
+        // Foot switch colour
+        if (FootChorus != null) { FootChorus.Stroke = borderBrush; FootChorus.Fill = bgBrush; }
+        // BPM sync: reset state on mode change, show/hide button
+        bool hasBpm = _fx_chr_type == ChorusType.Flanger || _fx_chr_type == ChorusType.Phaser
+                   || _fx_chr_type == ChorusType.Tremolo || _fx_chr_type == ChorusType.Vibrato;
+        _chr_bpm_sync = false;
+        _chr_sqr      = false;
+        // BtnChrBpmSync removed (replaced by note grid)
+        if (BtnChrGate != null) {
+            BtnChrGate.Background = bgBrush;
+            bool hasGate = _fx_chr_type == ChorusType.Flanger || _fx_chr_type == ChorusType.Phaser;
+            BtnChrGate.Visibility = hasGate ? Visibility.Visible : Visibility.Hidden;
+            if (LblChrGate != null) LblChrGate.Text = "GATE";
+        }
+        // MOD BPM note panel — visible for BPM-capable effects
+        bool hasBpmNote = _fx_chr_type == ChorusType.Flanger  || _fx_chr_type == ChorusType.Phaser
+                       || _fx_chr_type == ChorusType.Tremolo  || _fx_chr_type == ChorusType.Vibrato;
+        if (PanelModNotes != null)
+        PanelModNotes.Visibility = hasBpmNote ? Visibility.Visible : Visibility.Collapsed;
+        if (hasBpmNote) UpdateModNoteUI();
+        // TRM waveform panel
+        if (PanelTrmWave != null)
+        PanelTrmWave.Visibility = _fx_chr_type == ChorusType.Tremolo ? Visibility.Visible : Visibility.Hidden;
+        // WAH direction panel
+        if (PanelWahDir != null)
+        PanelWahDir.Visibility = _fx_chr_type == ChorusType.AutoWah ? Visibility.Visible : Visibility.Hidden;
+    }
+
+    // Note button click: press = BPM sync ON with that note, same press again = OFF.
+    // MOD (tag="mod") and DELAY (tag="dl") are independent.
+    void NoteBtn_Click(object sender, MouseButtonEventArgs e)
+    {
+        string tag = GetTag(e);
+        // tag format: "mod:dq" / "mod:q" / "mod:de" / "mod:e" / "mod:sx"
+        //             "dl:dq"  / "dl:q"  / "dl:de"  / "dl:e"  / "dl:sx"
+        string[] parts = tag.Split(':');
+        if (parts.Length != 2) return;
+        string grp   = parts[0]; // "mod" or "dl"
+        string note  = parts[1]; // "dq","q","de","e","sx"
+        NoteValue nv = note switch {
+            "dq" => NoteValue.DottedQuarter,
+            "q"  => NoteValue.Quarter,
+            "de" => NoteValue.DottedEighth,
+            "e"  => NoteValue.Eighth,
+            "sx" => NoteValue.Sixteenth,
+            _    => NoteValue.DottedEighth,
+        };
+        if (grp == "dl") {
+            bool wasOn = _dl_bpm_sync && _dl_note == nv;
+            _dl_bpm_sync = !wasOn;
+            _dl_note     = nv;
+            UpdateDlNoteUI();
+        } else {
+            bool wasOn = _chr_bpm_sync && _fx_note == nv;
+            _chr_bpm_sync = !wasOn;
+            _fx_note      = nv;
+            UpdateModNoteUI();
+        }
+        ApplyFx();
+    }
+
+    void UpdateModNoteUI()
+    {
+        var modClrs = _modType switch {
+            "flg" => ("#b72d7e","#f5dde8"),
+            "phs" => ("#5bb72d","#e8f5dd"),
+            "trm" => ("#2db7b7","#ddf5f5"),
+            "vib" => ("#2d44b7","#dde2f5"),
+            _     => ("#2d89b7","#ddeef5"),
+        };
+        var modBtns = new (Border? btn, NoteValue nv)[] {
+        (BtnModNDQ, NoteValue.DottedQuarter),
+        (BtnModNQ,  NoteValue.Quarter),
+        (BtnModNDE, NoteValue.DottedEighth),
+        (BtnModNE,  NoteValue.Eighth),
+        (BtnModNSX, NoteValue.Sixteenth),
+        };
+        foreach (var (btn, nv) in modBtns) {
+            if (btn == null) continue;
+            bool on = _chr_bpm_sync && _fx_note == nv;
+            ApplyModeButton(btn, on, modClrs.Item1, modClrs.Item2);
+            if (btn.Child is TextBlock tb2)
+                tb2.Foreground = on
+                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString(modClrs.Item2))
+                    : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888899"));
+        }
+    }
+
+    void UpdateDlNoteUI()
+    {
+        var dlBtns = new (Border? btn, NoteValue nv)[] {
+        (BtnDlNDQ, NoteValue.DottedQuarter),
+        (BtnDlNQ,  NoteValue.Quarter),
+        (BtnDlNDE, NoteValue.DottedEighth),
+        (BtnDlNE,  NoteValue.Eighth),
+        (BtnDlNSX, NoteValue.Sixteenth),
+        };
+        foreach (var (btn, nv) in dlBtns) {
+            if (btn == null) continue;
+            bool on = _dl_bpm_sync && _dl_note == nv;
+            ApplyModeButton(btn, on, "#8989b7", "#dde0ee");
+            if (btn.Child is TextBlock tb2)
+                tb2.Foreground = on
+                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#dde0ee"))
+                    : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888899"));
+        }
+        if (LblDlTime != null) LblDlTime.Text = _dl_bpm_sync ? "NOTE" : "TIME";
+    }
+
+    // Legacy BPM sync click — no-op (replaced by NoteBtn_Click)
+    void FxBpmSync_Click(object sender, MouseButtonEventArgs e) { }
+
+    void FxSqr_Click(object sender, MouseButtonEventArgs e)
+    {
+        _chr_sqr = !_chr_sqr;
+        UpdateSqrButtonUI();
+        ApplyFx();
+    }
+
+    // Tremolo waveform: TRI / SQR
+    bool _trm_sqr = false;
+    void TrmWave_Click(object sender, MouseButtonEventArgs e)
+    {
+        string tag = GetTag(e);
+        _trm_sqr = tag == "sqr";
+        UpdateTrmWaveUI();
+        _engine?.SetTremoloWaveform(_trm_sqr ? TremoloWaveform.Square : TremoloWaveform.Triangle);
+        ApplyFx();
+    }
+
+    void UpdateTrmWaveUI()
+    {
+        if (BtnTrmTri == null || BtnTrmSqr == null) return;
+        string ac = "#2db7b7", af = "#092d2d";
+        ApplyModeButton(BtnTrmTri, !_trm_sqr, ac, af);
+        ApplyModeButton(BtnTrmSqr,  _trm_sqr, ac, af);
+    }
+
+    // AutoWah direction: UP / DOWN
+    bool _wah_down = false;
+    void WahDir_Click(object sender, MouseButtonEventArgs e)
+    {
+        string tag = GetTag(e);
+        _wah_down = tag == "down";
+        UpdateWahDirUI();
+        _engine?.SetAutoWahMode(_wah_down ? WahMode.Down : WahMode.Up);
+        ApplyFx();
+    }
+
+    void UpdateWahDirUI()
+    {
+        if (BtnWahUp == null || BtnWahDown == null) return;
+        string ac = "#b7392d", af = "#2d0c09";
+        ApplyModeButton(BtnWahUp,   !_wah_down, ac, af);
+        ApplyModeButton(BtnWahDown,  _wah_down, ac, af);
+    }
+
+    // Helper: apply active/inactive style to a mode button
+    static void ApplyModeButton(Border btn, bool active, string activeColor, string activeFg)
+    {
+        if (active) {
+            btn.Background  = new SolidColorBrush((Color)ColorConverter.ConvertFromString(activeColor));
+            btn.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(activeColor));
+            if (btn.Child is TextBlock tb) tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(activeFg));
+        } else {
+            btn.Background  = new SolidColorBrush(Colors.Transparent);
+            btn.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#555566"));
+            if (btn.Child is TextBlock tb) tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888899"));
+        }
+    }
+
+    // Helper: extract Tag from mouse event source chain
+    static string GetTag(MouseButtonEventArgs e)
+    {
+        DependencyObject? el = e.OriginalSource as DependencyObject;
+        while (el != null) {
+            if (el is FrameworkElement fe && fe.Tag is string t && t.Length > 0) return t;
+            el = System.Windows.Media.VisualTreeHelper.GetParent(el);
+        }
+        return "";
+    }
+
+    void UpdateSqrButtonUI()
+    {
+        if (BtnChrGate == null) return;
+        string onColor = _fx_chr_type == ChorusType.Phaser ? "#88cc20" : "#e87090";
+        string offColor = _fx_chr_type == ChorusType.Phaser ? "#1a3a08" : "#3a0d1a";
+        BtnChrGate.Background = _chr_sqr
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString(onColor))
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString(offColor));
+        if (LblChrGate != null) LblChrGate.Text = _chr_sqr ? "GATE ON" : "GATE";
+    }
+
+    static string NoteLabel(NoteValue n) => n switch {
+        NoteValue.DottedQuarter => "♩.",
+        NoteValue.Quarter       => "♩",
+        NoteValue.DottedEighth  => "♪.",
+        NoteValue.Eighth        => "♪",
+        NoteValue.Sixteenth     => "♬",
+        _                       => "BPM",
+    };
+
     void ApplyPortamento()
     {
         float seconds = _porta_on ? (float)(SldPortamento.Value / 100.0 * 0.5) : 0f;
@@ -624,6 +967,16 @@ public partial class MainWindow : Window
         if (!_loaded) return;
         UpdateLfoRateDisplay();
         if (ValLfoDelay != null) ValLfoDelay.Text = ((int)SldLfoDelay.Value).ToString();
+        // Sync ARP BPM when S/H is active
+        if (_lfo_wave == LfoWave.SH && SldArpRate != null) {
+            float bpm = 40f + (float)(SldLfoRate.Value / 100.0) * 200f;
+            double arpVal = Math.Clamp(bpm, 40, 240);
+            if (Math.Abs(SldArpRate.Value - arpVal) > 0.5) {
+                SldArpRate.Value = arpVal;
+                // ArpRate_Changed will handle _arp_bpm update
+                return;
+            }
+        }
         ApplyLfoRouting();
     }
 
@@ -642,14 +995,21 @@ public partial class MainWindow : Window
         }
     }
 
-    // ARP RATE slider: update readout.
+    // ARP RATE slider: now Minimum=40 Maximum=240, direct BPM value.
     void ArpRate_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
-        // 0..100 -> 40..240 BPM
-        float bpm = 40f + (float)(SldArpRate.Value / 100.0) * 200f;
+        float bpm = (float)SldArpRate.Value;
         if (ValArpRate != null) ValArpRate.Text = ((int)bpm).ToString();
+        _arp_bpm = bpm;
         _engine?.SetArpRate(bpm);
+        // Sync LFO S/H BPM slider to ARP BPM
+        if (SldLfoRate != null && _lfo_wave == LfoWave.SH) {
+            double shVal = Math.Clamp((bpm - 40.0) / 200.0 * 100.0, 0, 100);
+            if (Math.Abs(SldLfoRate.Value - shVal) > 0.5) SldLfoRate.Value = shVal;
+        }
+        // If BPM sync is active, re-apply to keep FX in sync.
+        if (_dl_bpm_sync || _chr_bpm_sync) ApplyFx();
     }
 
     // LFO-amount sliders (DCF/DCA): readout + route to engine.
@@ -698,9 +1058,9 @@ public partial class MainWindow : Window
 
     // ── FX rotary knobs (BOSS-style, drag to turn) ─────────────────────
     readonly Dictionary<string, double> _fx_knob = new() {
-        ["ch:send"]=0, ["ch:rate"]=50, ["ch:depth"]=50,
-        ["dl:send"]=0, ["dl:time"]=50, ["dl:fb"]=45,
-        ["rv:send"]=0, ["rv:size"]=50, ["rv:damp"]=50,
+        ["ch:send"]=50, ["ch:rate"]=50, ["ch:depth"]=50,
+        ["dl:send"]=50, ["dl:time"]=50, ["dl:fb"]=50,
+        ["rv:send"]=50, ["rv:size"]=50, ["rv:damp"]=50,
     };
     bool _chorus_on, _delay_on, _reverb_on;
     string? _drag_knob;
@@ -736,14 +1096,24 @@ public partial class MainWindow : Window
     // Rotate the indicator: 0..100 -> -135°..+135°.
     void UpdateKnobVisual(string tag)
     {
-        double angle = -135 + (_fx_knob[tag] / 100.0) * 270.0;
+        double val = _fx_knob[tag];
+        double angle = -135 + (val / 100.0) * 270.0;
         RotateTransform? rot = tag switch {
-            "ch:send" => RotChSend, "ch:rate" => RotChRate, "ch:depth" => RotChDepth,
-            "dl:send" => RotDlSend, "dl:time" => RotDlTime, "dl:fb" => RotDlFb,
-            "rv:send" => RotRvSend, "rv:size" => RotRvSize, "rv:damp" => RotRvDamp,
+        "ch:send" => RotChSend, "ch:rate" => RotChRate, "ch:depth" => RotChDepth,
+        "dl:send" => RotDlSend, "dl:time" => RotDlTime, "dl:fb"    => RotDlFb,
+        "rv:send" => RotRvSend, "rv:size" => RotRvSize, "rv:damp"  => RotRvDamp,
             _ => null,
         };
         if (rot != null) rot.Angle = angle;
+        // Update numeric readout
+        string v = ((int)val).ToString();
+        TextBlock? lbl = tag switch {
+        "ch:send" => ValChSend,  "ch:rate" => ValChRate,  "ch:depth" => ValChDepth,
+        "dl:send" => ValDlSend,  "dl:time" => ValDlTime,  "dl:fb"    => ValDlFb,
+        "rv:send" => ValRvSend,  "rv:size" => ValRvSize,  "rv:damp"  => ValRvDamp,
+            _ => null,
+        };
+        if (lbl != null) lbl.Text = v;
     }
 
     void UpdateAllKnobVisuals()
@@ -774,13 +1144,54 @@ public partial class MainWindow : Window
         _engine.SetDelaySend (_delay_on  ? (float)(_fx_knob["dl:send"] / 100.0) : 0f);
         _engine.SetReverbSend(_reverb_on ? (float)(_fx_knob["rv:send"] / 100.0) : 0f);
 
-        // CHORUS RATE: 0.1..2.0 Hz, log (centre ~0.45 Hz). DEPTH: 0..0.7 linear (centre 0.35).
-        _engine.SetChorusParams(LogMap(_fx_knob["ch:rate"], 0.1f, 2.0f),
-                                (float)(_fx_knob["ch:depth"] / 100.0) * 0.7f);
-        // DELAY TIME: 60..600 ms, log (centre ~190 ms). F.B: 0..0.85 linear (centre ~0.43).
-        _engine.SetDelayParams(LogMap(_fx_knob["dl:time"], 0.06f, 0.6f),
-                               (float)(_fx_knob["dl:fb"] / 100.0) * 0.85f);
-        // REVERB SIZE: 0.3..0.95 linear (centre ~0.63). DAMP: 0..0.8 linear (centre 0.4).
+        // CHORUS/FLANGER/PHASER slot
+        float chrRate  = LogMap(_fx_knob["ch:rate"],  0.1f, 2.0f);
+        float chrDepth = (float)(_fx_knob["ch:depth"] / 100.0);
+        switch (_fx_chr_type) {
+            case ChorusType.Flanger:
+                float flgRate  = LogMap(_fx_knob["ch:rate"], 0.1f, 4.0f);
+                float flgDepth = Math.Min(1f, (float)(_fx_knob["ch:depth"] / 100.0) * 1.5f);
+                if (_chr_bpm_sync) _engine.SetFlangerBpmSync(_arp_bpm, _fx_note);
+                else               _engine.SetFlangerParams(flgRate, flgDepth, flgDepth * 0.8f);
+                _engine.SetFlangerLfoWaveform(LfoWaveform.Sine); // always sine; gate via StepMode
+                _engine.SetFlangerStepMode(_chr_sqr ? FlangerStepMode.Gate1 : FlangerStepMode.Off);
+                break;
+            case ChorusType.Phaser:
+                float phsRate  = LogMap(_fx_knob["ch:rate"], 0.1f, 4.0f);
+                float phsDepth = Math.Min(1f, (float)(_fx_knob["ch:depth"] / 100.0) * 1.5f);
+                if (_chr_bpm_sync) _engine.SetPhaserBpmSync(_arp_bpm, _fx_note);
+                else               _engine.SetPhaserParams(phsRate, phsDepth, Math.Min(0.95f, phsDepth * 1.4f));
+                _engine.SetPhaserLfoWaveform(_chr_sqr ? LfoWaveform.Square : LfoWaveform.Sine);
+                break;
+            case ChorusType.Tremolo:
+                float trmRate  = LogMap(_fx_knob["ch:rate"],  0.1f, 8.0f);
+                float trmDepth = (float)(_fx_knob["ch:depth"] / 100.0);
+                if (_chr_bpm_sync) _engine.SetTremoloParams(_fx_note.ToHz(_arp_bpm), trmDepth);
+                else               _engine.SetTremoloParams(trmRate, trmDepth);
+                break;
+            case ChorusType.Vibrato:
+                float vibRate  = LogMap(_fx_knob["ch:rate"],  0.1f, 8.0f);
+                float vibDepth = (float)(_fx_knob["ch:depth"] / 100.0);
+                if (_chr_bpm_sync) _engine.SetVibratoParams(_fx_note.ToHz(_arp_bpm), vibDepth);
+                else               _engine.SetVibratoParams(vibRate, vibDepth);
+                break;
+            case ChorusType.AutoWah:
+                float wahSens = (float)(_fx_knob["ch:rate"]  / 100.0);
+                float wahPeak = (float)(_fx_knob["ch:depth"] / 100.0);
+                _engine.SetAutoWahParams(wahSens, 0.5f, wahPeak);
+                break;
+            default:
+                _engine.SetChorusParams(chrRate, chrDepth * 0.7f);
+                break;
+        }
+
+        // DELAY: BPM sync (note value) or direct ms
+        if (_dl_bpm_sync)
+            _engine.SetDelayBpmSync(_arp_bpm, _dl_note);
+        else
+            _engine.SetDelayParams(LogMap(_fx_knob["dl:time"], 0.06f, 0.6f),
+                                   (float)(_fx_knob["dl:fb"] / 100.0) * 0.85f);
+
         _engine.SetReverbParams(0.3f + (float)(_fx_knob["rv:size"] / 100.0) * 0.65f,
                                 (float)(_fx_knob["rv:damp"] / 100.0) * 0.8f);
     }
