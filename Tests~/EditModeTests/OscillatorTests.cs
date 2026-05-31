@@ -12,8 +12,8 @@ public class OscillatorTests
     const int SR = 44100;
 
     static OscParams MakeParams(WaveType wave,
-        Interpolation interp = Interpolation.Linear, float pw = 0.5f)
-        => new(wave, interp, 0f, pw, 1f);
+        Interpolation interp = Interpolation.Linear, float pw = 0.5f, float shape = 0.5f)
+        => new(wave, interp, 0f, pw, shape, 1f);
 
     [Test] public void Sine_OutputRangeAndAmplitudeAreValid()
     {

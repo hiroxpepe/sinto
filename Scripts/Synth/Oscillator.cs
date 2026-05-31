@@ -31,22 +31,44 @@ public struct Oscillator {
         double t  = _phase;       // [0, 1)
         double dt = _phase_inc;   // [0, 1)
         WaveType w = p.Wave;
+        // Phase distortion (shape): remap the cycle so the front half is
+        // compressed (shape<0.5) or the back half (shape>0.5).
+        // ts spans the full [0,1) so all wave generators work correctly.
+        // A soft-knee (cubic) on the pivot keeps the centre region gentle.
+        double ts = t;
+        float s = p.Shape;
+        bool shaped = false;
+        if (s != 0.5f && (w & (WaveType.Saw | WaveType.Triangle | WaveType.Sine)) != 0) {
+            double d = s - 0.5;
+            double pivot = 0.5 + d * Math.Abs(d) * 3.0;
+            pivot = pivot < 0.01 ? 0.01 : pivot > 0.99 ? 0.99 : pivot;
+            ts = t < pivot
+                ? (t / pivot) * 0.5
+                : 0.5 + ((t - pivot) / (1.0 - pivot)) * 0.5;
+            shaped = true;
+        }
         float sum = 0f;
         int active = 0;
-        if ((w & WaveType.Sine) != 0)     { sum += GenSine(t);          active++; }
-        if ((w & WaveType.Saw) != 0)      { sum += GenSaw(t, dt);       active++; }
-        if ((w & WaveType.Square) != 0)   { sum += GenSquare(t, dt, p.PulseWidth); active++; }
-        if ((w & WaveType.Triangle) != 0) { sum += GenTriangle(t, dt);  active++; }
-        if ((w & WaveType.Noise) != 0)    { sum += GenNoise();          active++; }
-        if ((w & WaveType.Pink) != 0)     { sum += GenPink();           active++; }
-        // Power-based normalisation (÷√n): stacked waveforms keep their loudness
-        // far better than ÷n while still leaving headroom against clipping.
+        if ((w & WaveType.Sine) != 0)     { sum += GenSine(ts);                       active++; }
+        if ((w & WaveType.Saw) != 0)      { sum += shaped ? GenSawNaive(ts) : GenSaw(t, dt);           active++; }
+        if ((w & WaveType.Square) != 0)   { sum += GenSquare(t, dt, p.PulseWidth);    active++; }
+        if ((w & WaveType.Triangle) != 0) { sum += shaped ? GenTriNaive(ts)  : GenTriangle(t, dt);     active++; }
+        if ((w & WaveType.Noise) != 0)    { sum += GenNoise();                        active++; }
+        if ((w & WaveType.Pink) != 0)     { sum += GenPink();                         active++; }
         float sample = active > 1 ? sum / MathF.Sqrt(active) : sum;
 
         _phase += _phase_inc;
         if (_phase >= 1.0) _phase -= 1.0;
         return sample * p.Level;
     }
+
+    // Naive (no polyBLEP) generators used when Shape is active.
+    // PolyBLEP relies on t/dt relationships that break with a shaped phase.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static float GenSawNaive(double t) => (float)(2.0 * t - 1.0);  // -1..+1
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static float GenTriNaive(double t) => (float)(t < 0.5 ? 4.0 * t - 1.0 : 3.0 - 4.0 * t); // -1..+1
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     float GenSine(double t) => Calc.SinFast(t * TWO_PI);

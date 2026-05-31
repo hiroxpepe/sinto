@@ -215,6 +215,7 @@ public partial class MainWindow : Window
 
     void MainWindow_Closed(object? sender, EventArgs e)
     {
+        _scopeWin?.Close();
         if (_midi_in != null) {
             _midi_in.Stop();
             _midi_in.Dispose();
@@ -415,11 +416,13 @@ public partial class MainWindow : Window
     {
         float l1 = (float)(SldOsc1Lvl?.Value ?? 100) / 100f;
         float l2 = (float)(SldOsc2Lvl?.Value ?? 50)  / 100f;
-        float dt = (float)(SldDetune  ?.Value ?? 50) - 50f; // -50 to +50 cents
+        float dt = (float)(SldDetune  ?.Value ?? 50) - 50f;
         _engine?.SetOscParams(l1, l2, dt);
-        float pw1 = (float)(SldOsc1Pw?.Value ?? 50) / 100f; // 0.01..0.99
+        float pw1 = (float)(SldOsc1Pw?.Value ?? 50) / 100f;
         float pw2 = (float)(SldOsc2Pw?.Value ?? 50) / 100f;
         _engine?.SetPulseWidth(pw1, pw2);
+        // Shape (SHP): slider 0..100 → 0..1, centre 50 = neutral.
+        _engine?.SetShape(pw1, pw2); // reuse same slider for SHP mode
     }
 
     // ── Wave selection ──────────────────────────────────────────────────
@@ -523,6 +526,9 @@ public partial class MainWindow : Window
         if (SldOsc2Pw   != null) SldOsc2Pw.IsEnabled   = pw2;
         if (ValOsc2Pw   != null) ValOsc2Pw.IsEnabled   = pw2;
         if (Osc2PwPanel != null) Osc2PwPanel.IsEnabled = pw2;
+        // Update PW/SHP label and slider range per oscillator.
+        UpdatePwShpSlider(1, w1);
+        UpdatePwShpSlider(2, w2);
     }
 
     WaveType WaveFromSelection(string group)
@@ -576,6 +582,25 @@ public partial class MainWindow : Window
     }
 
     // Portamento glide time is applied only when ON; OFF forces instant (0s).
+    // Mouse wheel on any slider: nudge its value by ±1.
+    protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnPreviewMouseWheel(e);
+        if (e.OriginalSource is FrameworkElement fe) {
+            // Walk up the visual tree to find the nearest Slider.
+            DependencyObject? el = fe;
+            while (el != null) {
+                if (el is Slider sld) {
+                    sld.Value = Math.Clamp(sld.Value + (e.Delta > 0 ? 1 : -1),
+                                           sld.Minimum, sld.Maximum);
+                    e.Handled = true;
+                    return;
+                }
+                el = System.Windows.Media.VisualTreeHelper.GetParent(el);
+            }
+        }
+    }
+
     void BtnScope_Click(object sender, RoutedEventArgs e)
     {
         if (_scopeWin == null || !_scopeWin.IsVisible) {
@@ -643,6 +668,32 @@ public partial class MainWindow : Window
         if (ValHpf != null) ValHpf.Text = ((int)SldHpf.Value).ToString();
         _engine?.SetHpf((float)SldHpf.Value);
         DebugLog($"HPF {(int)SldHpf.Value}");
+    }
+
+    // Update the PW/SHP slider label, range and enable state for one oscillator.
+    // SQR only → PW (1..99). Noise/Pink only → disabled. Otherwise → SHP (0..100).
+    void UpdatePwShpSlider(int osc, WaveType w)
+    {
+        var sld = osc == 1 ? SldOsc1Pw : SldOsc2Pw;
+        var val = osc == 1 ? ValOsc1Pw : ValOsc2Pw;
+        var lbl = osc == 1 ? Osc1PwPanel : Osc2PwPanel;
+        if (sld == null || val == null || lbl == null) return;
+        bool hasSquare = (w & WaveType.Square) != 0;
+        bool hasTonal  = (w & (WaveType.Saw | WaveType.Triangle | WaveType.Sine)) != 0;
+        bool noiseOnly = !hasSquare && !hasTonal;
+        if (noiseOnly) {
+            sld.IsEnabled = val.IsEnabled = lbl.IsEnabled = false;
+            ((TextBlock)lbl).Text = "PW";
+        } else if (hasSquare && !hasTonal) {
+            sld.IsEnabled = val.IsEnabled = lbl.IsEnabled = true;
+            sld.Minimum = 1; sld.Maximum = 99;
+            ((TextBlock)lbl).Text = "PW";
+        } else {
+            // SHP: tonal only, or tonal+SQR combo (Signo's signature sound)
+            sld.IsEnabled = val.IsEnabled = lbl.IsEnabled = true;
+            sld.Minimum = 0; sld.Maximum = 100;
+            ((TextBlock)lbl).Text = "SHP";
+        }
     }
 
     // ── FX rotary knobs (BOSS-style, drag to turn) ─────────────────────

@@ -153,14 +153,25 @@ public sealed class Voices {
         }
     }
 
+    /// <summary>Wave shape per oscillator (0..1, 0.5 = neutral). Applies to SAW/TRI/SIN.</summary>
+    public void SetShape(float osc1Shape, float osc2Shape) {
+        for (int i = 0; i < _max_voices; i++) {
+            ref var v = ref _voices[i];
+            v.Osc1Params = new OscParams(v.Osc1Params.Wave, v.Osc1Params.Interp,
+                v.Osc1Params.DetuneCents, v.Osc1Params.PulseWidth, osc1Shape, v.Osc1Params.Level);
+            v.Osc2Params = new OscParams(v.Osc2Params.Wave, v.Osc2Params.Interp,
+                v.Osc2Params.DetuneCents, v.Osc2Params.PulseWidth, osc2Shape, v.Osc2Params.Level);
+        }
+    }
+
     /// <summary>Square pulse width per oscillator (0.01..0.99). Applies to live voices.</summary>
     public void SetPulseWidth(float osc1Pw, float osc2Pw) {
         for (int i = 0; i < _max_voices; i++) {
             ref var v = ref _voices[i];
             v.Osc1Params = new OscParams(v.Osc1Params.Wave, v.Osc1Params.Interp,
-                v.Osc1Params.DetuneCents, osc1Pw, v.Osc1Params.Level);
+                v.Osc1Params.DetuneCents, osc1Pw, v.Osc1Params.Shape, v.Osc1Params.Level);
             v.Osc2Params = new OscParams(v.Osc2Params.Wave, v.Osc2Params.Interp,
-                v.Osc2Params.DetuneCents, osc2Pw, v.Osc2Params.Level);
+                v.Osc2Params.DetuneCents, osc2Pw, v.Osc2Params.Shape, v.Osc2Params.Level);
         }
     }
 

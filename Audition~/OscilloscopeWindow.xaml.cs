@@ -24,8 +24,12 @@ public partial class OscilloscopeWindow : Window
     bool _running = true;
     bool _showDco = true;
     bool _trigZero = true;
-    double _timeDiv = 4.0;
-    double _dcoLevel = 1.0;
+    double _timeDiv = 15.0;  // display ms (log-mapped from slider)
+    double _dcoLevel = 0.707; // display gain (log-mapped from slider)
+
+    // Log map: slider 0..100 → [min, max] with centre (50) at geometric mean.
+    static double LogMap(double v, double min, double max)
+        => min * Math.Pow(max / min, v / 100.0);
 
     // Grid line cache
     readonly System.Windows.Shapes.Line[] _hLines = new System.Windows.Shapes.Line[5];
@@ -87,7 +91,8 @@ public partial class OscilloscopeWindow : Window
         double h = ScopeCanvas.ActualHeight;
         if (w < 10 || h < 10) return;
 
-        int displaySamples = (int)(1024 * _timeDiv);
+        // _timeDiv is now in milliseconds; convert to sample count.
+        int displaySamples = (int)(_timeDiv / 1000.0 * 44100);
         float[] buf = _scope.GetSnapshot(displaySamples);
         if (buf.Length == 0) return;
 
@@ -185,12 +190,17 @@ public partial class OscilloscopeWindow : Window
 
     void SldTimeDiv_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        _timeDiv = e.NewValue;
-        if (LblTimeDiv != null) LblTimeDiv.Text = $"×{(int)_timeDiv}";
+        // Log map: 0..100 → 5ms..45ms, centre 50 = 15ms
+        _timeDiv = LogMap(e.NewValue, 5.0, 45.0);
+        if (LblTimeDiv != null) LblTimeDiv.Text = $"{_timeDiv:F1}ms";
     }
 
     void SldDcoLevel_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
-        => _dcoLevel = e.NewValue;
+    {
+        // Log map: 0..100 → 0.2..2.5, centre 50 = 0.707 ≈ 0.7
+        _dcoLevel = LogMap(e.NewValue, 0.2, 2.5);
+        if (LblDcoLevel != null) LblDcoLevel.Text = $"×{_dcoLevel:F1}";
+    }
 
     void ToggleBtn(Button b, bool on)
     {

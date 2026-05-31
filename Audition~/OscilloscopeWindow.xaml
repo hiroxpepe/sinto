@@ -115,14 +115,16 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="TIME/DIV" FontSize="8" FontFamily="Consolas"
                            Foreground="#444444" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <Slider x:Name="SldTimeDiv" Minimum="1" Maximum="8" Value="4"
+                <Slider x:Name="SldTimeDiv" Minimum="0" Maximum="100" Value="50"
                         Width="80" VerticalAlignment="Center" ValueChanged="SldTimeDiv_Changed"/>
-                <TextBlock x:Name="LblTimeDiv" Text="×4" FontSize="9" FontFamily="Consolas"
+                <TextBlock x:Name="LblTimeDiv" Text="15.0ms" FontSize="9" FontFamily="Consolas"
                            Foreground="#888888" VerticalAlignment="Center" Margin="6,0,16,0"/>
                 <TextBlock Text="DCO" FontSize="8" FontFamily="Consolas"
                            Foreground="#39ff7a" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <Slider x:Name="SldDcoLevel" Minimum="0.1" Maximum="3" Value="1"
+                <Slider x:Name="SldDcoLevel" Minimum="0" Maximum="100" Value="50"
                         Width="60" VerticalAlignment="Center" ValueChanged="SldDcoLevel_Changed"/>
+                <TextBlock x:Name="LblDcoLevel" Text="×0.7" FontSize="9" FontFamily="Consolas"
+                           Foreground="#39ff7a" VerticalAlignment="Center" Margin="4,0,0,0"/>
 
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
