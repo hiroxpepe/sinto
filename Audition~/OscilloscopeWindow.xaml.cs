@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Signo.Core.Audio;
 
 namespace Signo.Audition;
 
@@ -19,13 +20,18 @@ public partial class OscilloscopeWindow : Window
 {
     // ── References ──────────────────────────────────────────────────────
     readonly ScopeBuffer _scope;
+    readonly ScopeRenderer _renderer = new();
+
+    // Number of horizontal grid divisions across the canvas.
+    const int GRID_DIVS = Signo.Core.Audio.OscilloscopeDefaults.GridDivs;
 
     // ── State ────────────────────────────────────────────────────────────
     bool _running = true;
     bool _showDco = true;
     bool _trigZero = true;
-    double _timeDiv = 15.0;  // display ms (log-mapped from slider)
+    double _timeDiv = 1.8;   // display ms; slider centre (50%); 1.8ms×5div=9ms ≈ 4 cycles for A4
     double _dcoLevel = 0.707; // display gain (log-mapped from slider)
+    bool _autoGain = true;   // smoothed auto-scale so waveform fills the screen
 
     // Log map: slider 0..100 → [min, max] with centre (50) at geometric mean.
     static double LogMap(double v, double min, double max)
@@ -91,51 +97,34 @@ public partial class OscilloscopeWindow : Window
         double h = ScopeCanvas.ActualHeight;
         if (w < 10 || h < 10) return;
 
-        // _timeDiv is now in milliseconds; convert to sample count.
-        int displaySamples = (int)(_timeDiv / 1000.0 * 44100);
-        float[] buf = _scope.GetSnapshot(displaySamples);
+        // TIME/DIV (ms per division) × divisions = full-screen time window.
+        int displaySamples = (int)(_timeDiv * GRID_DIVS / 1000.0 * 44100);
+        // Capture EXTRA samples (headroom) so the zero-cross trigger can slide
+        // forward to a consistent phase and STILL have displaySamples left.
+        // Without headroom the trace length varies per frame → horizontal jitter.
+        int headroom = displaySamples / 2;
+        float[] buf = _scope.GetSnapshot(displaySamples + headroom);
         if (buf.Length == 0) return;
 
-        // DC offset removal.
-        float mean = 0f;
-        for (int i = 0; i < buf.Length; i++) mean += buf[i];
-        mean /= buf.Length;
-        for (int i = 0; i < buf.Length; i++) buf[i] -= mean;
+        // Delegate all rendering logic to the WPF-independent ScopeRenderer
+        // (fixed scale, zero-cross trigger, DC removal, full-width mapping).
+        _renderer.Width          = w;
+        _renderer.Height         = h;
+        _renderer.Gain           = _dcoLevel;
+        _renderer.TrigZero       = _trigZero;
+        _renderer.DisplaySamples = displaySamples;
+        _renderer.AutoGain       = _autoGain;
 
-        // Normalise to peak so the waveform fills ~90% of the screen height.
-        float peak = 0f;
-        for (int i = 0; i < buf.Length; i++) { float a = MathF.Abs(buf[i]); if (a > peak) peak = a; }
-        if (peak > 0.001f)
-            for (int i = 0; i < buf.Length; i++) buf[i] /= peak;
-
-        WaveDco.Points = _showDco ? BuildPoints(buf, w, h, _dcoLevel) : new PointCollection();
+        if (_showDco) {
+            var rendered = _renderer.Render(buf);
+            var pts = new PointCollection(rendered.Length);
+            foreach (var (x, y) in rendered) pts.Add(new Point(x, y));
+            WaveDco.Points = pts;
+        } else {
+            WaveDco.Points = new PointCollection();
+        }
 
         UpdateStatus(buf);
-    }
-
-    PointCollection BuildPoints(float[] buf, double w, double h, double level)
-    {
-        if (buf.Length == 0) return new PointCollection();
-        double cy = h / 2;
-        int start = 0;
-
-        // Zero-cross trigger: find the first upward zero crossing.
-        if (_trigZero) {
-            for (int i = 1; i < buf.Length - 1; i++) {
-                if (buf[i - 1] < 0 && buf[i] >= 0) { start = i; break; }
-            }
-        }
-
-        int len = buf.Length - start;
-        var pts = new PointCollection(len);
-        double xStep = w / len;
-        for (int i = 0; i < len; i++) {
-            double x = i * xStep;
-            float s = buf[start + i];
-            double y = cy - s * cy * 0.85 * level;
-            pts.Add(new Point(x, y));
-        }
-        return pts;
     }
 
     void UpdateStatus(float[] buf)
@@ -191,7 +180,7 @@ public partial class OscilloscopeWindow : Window
     void SldTimeDiv_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         // Log map: 0..100 → 5ms..45ms, centre 50 = 15ms
-        _timeDiv = LogMap(e.NewValue, 5.0, 45.0);
+        _timeDiv = LogMap(e.NewValue, 0.6, 5.4);
         if (LblTimeDiv != null) LblTimeDiv.Text = $"{_timeDiv:F1}ms";
     }
 

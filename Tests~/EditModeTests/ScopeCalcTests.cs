@@ -19,16 +19,16 @@ public class ScopeCalcTests
         => min * Math.Pow(max / min, v / 100.0);
 
     [Test]
-    public void TimeDiv_Centre50_Is15ms()
-        => Assert.That(LogMap(50, 5.0, 45.0), Is.EqualTo(15.0).Within(0.1));
+    public void TimeDiv_Centre50_Is1Point8ms()
+        => Assert.That(LogMap(50, 0.6, 5.4), Is.EqualTo(1.8).Within(0.1));
 
     [Test]
-    public void TimeDiv_Min0_Is5ms()
-        => Assert.That(LogMap(0, 5.0, 45.0), Is.EqualTo(5.0).Within(0.01));
+    public void TimeDiv_Min0_Is0Point6ms()
+        => Assert.That(LogMap(0, 0.6, 5.4), Is.EqualTo(0.6).Within(0.01));
 
     [Test]
-    public void TimeDiv_Max100_Is45ms()
-        => Assert.That(LogMap(100, 5.0, 45.0), Is.EqualTo(45.0).Within(0.01));
+    public void TimeDiv_Max100_Is5Point4ms()
+        => Assert.That(LogMap(100, 0.6, 5.4), Is.EqualTo(5.4).Within(0.01));
 
     [Test]
     public void DcoLevel_Centre50_IsPoint7()
