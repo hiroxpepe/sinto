@@ -9,7 +9,7 @@ using Signo.Core.Synth;
 namespace Signo.Tests.Synth;
 
 /// <summary>
-/// Arpeggiator integrated into the Engine. When ARP is on, held notes are
+/// Arpeggiator integrated into the VAEngine. When ARP is on, held notes are
 /// collected and the engine plays one at a time at the arp rate (audio-thread
 /// driven). When off, notes play normally (polyphonic).
 /// </summary>
@@ -18,7 +18,7 @@ public class ArpEngineTests
 {
     const int SR = 44100;
 
-    static int ActiveAfter(Engine e, int renderCalls, int bufFrames = 256)
+    static int ActiveAfter(VAEngine e, int renderCalls, int bufFrames = 256)
     {
         var buf = new float[bufFrames * 2];
         for (int i = 0; i < renderCalls; i++) e.ProcessAudioCallback(buf.AsSpan());
@@ -28,7 +28,7 @@ public class ArpEngineTests
     [Test]
     public void ArpOff_ChordPlaysPolyphonically()
     {
-        var e = new Engine(SR, 2, 32, 256);
+        var e = new VAEngine(SR, 2, 32, 256);
         e.SetArpEnabled(false);
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
         e.SendNoteOn(64, 0.8f, 2, 5, 0);
@@ -40,7 +40,7 @@ public class ArpEngineTests
     [Test]
     public void ArpOn_PlaysOneNoteAtATime()
     {
-        var e = new Engine(SR, 2, 32, 256);
+        var e = new VAEngine(SR, 2, 32, 256);
         e.SetArpEnabled(true);
         e.SetArpRate(120f); // 120 BPM
         e.SetArpMode(ArpMode.Up);
@@ -56,7 +56,7 @@ public class ArpEngineTests
     [Test]
     public void ArpOn_AdvancesOverTime()
     {
-        var e = new Engine(SR, 2, 32, 256);
+        var e = new VAEngine(SR, 2, 32, 256);
         e.SetArpEnabled(true);
         e.SetArpRate(240f); // fast so steps occur within the render window
         e.SetArpMode(ArpMode.Up);
@@ -77,7 +77,7 @@ public class ArpEngineTests
     [Test]
     public void ArpOn_NoHeldNotes_NothingSounds()
     {
-        var e = new Engine(SR, 2, 32, 256);
+        var e = new VAEngine(SR, 2, 32, 256);
         e.SetArpEnabled(true);
         e.SetArpRate(120f);
         int active = ActiveAfter(e, 4);
@@ -87,7 +87,7 @@ public class ArpEngineTests
     [Test]
     public void ArpDisabledMidPlay_StopsArpVoices()
     {
-        var e = new Engine(SR, 2, 32, 256);
+        var e = new VAEngine(SR, 2, 32, 256);
         e.SetArpEnabled(true);
         e.SetArpRate(120f);
         e.SetArpMode(ArpMode.Up);

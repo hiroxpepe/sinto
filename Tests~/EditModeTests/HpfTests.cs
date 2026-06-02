@@ -77,17 +77,17 @@ public class HpfTests
     }
 
     [Test]
-    public void Engine_SetHpf_AttenuatesOutputLowEnd()
+    public void VAEngine_SetHpf_AttenuatesOutputLowEnd()
     {
         // End-to-end: with HPF high, a low note's output RMS should drop versus HPF off.
-        var e1 = new Engine(SR, 2, 32, 1024);
+        var e1 = new VAEngine(SR, 2, 32, 1024);
         e1.SetHpf(0f);
         var b1 = new float[SR / 2];
         e1.SendNoteOn(36, 0.9f, 2, 5, 0); // low C2
         e1.ProcessAudioCallback(b1.AsSpan());
         float rmsOff = Rms(b1.AsSpan(2000));
 
-        var e2 = new Engine(SR, 2, 32, 1024);
+        var e2 = new VAEngine(SR, 2, 32, 1024);
         e2.SetHpf(100f); // strong high-pass (0..100 scale)
         var b2 = new float[SR / 2];
         e2.SendNoteOn(36, 0.9f, 2, 5, 0);

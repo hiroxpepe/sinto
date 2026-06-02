@@ -10,24 +10,24 @@ namespace Signo.Tests.Synth;
 public class EngineTests
 {
     [Test] public void Constructor_DoesNotThrow()
-        => Assert.DoesNotThrow(() => { using var e = new Engine(); });
+        => Assert.DoesNotThrow(() => { using var e = new VAEngine(); });
 
     [Test] public void IsPaused_InitiallyFalse()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         Assert.That(e.isPaused, Is.False);
     }
 
     [Test] public void Pause_SetsPausedTrue()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.Pause();
         Assert.That(e.isPaused, Is.True);
     }
 
     [Test] public void Resume_SetsPausedFalse()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.Pause();
         e.Resume();
         Assert.That(e.isPaused, Is.False);
@@ -35,7 +35,7 @@ public class EngineTests
 
     [Test] public void ProcessAudioCallback_WhilePaused_ZeroesBuffer()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.Pause();
         var buf = new float[512];
         for (int i = 0; i < buf.Length; i++) buf[i] = 1.0f;
@@ -45,33 +45,33 @@ public class EngineTests
 
     [Test] public void ProcessAudioCallback_EmptyBuffer_DoesNotThrow()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         Assert.DoesNotThrow(() => e.ProcessAudioCallback(Span<float>.Empty));
     }
 
     [Test] public void SendNoteOn_ValidNote_ReturnsTrue()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         Assert.That(e.SendNoteOn(60, 0.8f, 2, 5, 0), Is.True);
     }
 
     [Test] public void SendNoteOff_DoesNotThrow()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
         Assert.DoesNotThrow(() => e.SendNoteOff(60, 2, 0));
     }
 
     [Test] public void SetBPM_StoresBpm()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SetBPM(140f);
         Assert.That(e.currentBpm, Is.EqualTo(140f).Within(0.1f));
     }
 
     [Test] public void ActiveVoices_Initially_IsZero()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         Assert.That(e.activeVoices, Is.EqualTo(0));
     }
 
@@ -89,7 +89,7 @@ public class EngineTests
         // Verify that processing a buffer with no events keeps activeVoices = 0.
         // The None event defense is: (1) default(Event).Kind == None proven above,
         // (2) ApplyEvent must have a case/default that discards None without triggering NoteOn.
-        using var e = new Engine();
+        using var e = new VAEngine();
         var buf = new float[512];
         // Process empty buffer (ring buffer has no events = effectively None events)
         e.ProcessAudioCallback(buf.AsSpan());
@@ -112,7 +112,7 @@ public class EngineTests
         const int Channels = 2;       // stereo — exercises the frame/sample distinction
         const int Offset   = 512;     // fire at frame 512
 
-        using var e = new Engine(sampleRate: SR, channels: Channels, bufferSize: Frames);
+        using var e = new VAEngine(sampleRate: SR, channels: Channels, bufferSize: Frames);
         e.SendNoteOn(60, 1.0f, 2, 5, (ushort)Offset);
         var buf = new float[Frames * Channels]; // stereo interleaved
         e.ProcessAudioCallback(buf.AsSpan());
@@ -135,7 +135,7 @@ public class EngineTests
     {
         // Explicit None case in switch prevents phantom NoteOn.
         // Processing 1000 buffers with no events must keep voices at 0.
-        using var e = new Engine();
+        using var e = new VAEngine();
         var buf = new float[512];
         for (int i = 0; i < 1000; i++)
             e.ProcessAudioCallback(buf.AsSpan());
@@ -147,7 +147,7 @@ public class EngineTests
     {
         // DoesNotThrow alone does not prove DspTime is not accumulating.
         // Numerically verify dspTimeSamples does not advance while paused.
-        using var e = new Engine();
+        using var e = new VAEngine();
         var buf = new float[512];
 
         // Process one buffer to establish DspTime baseline
@@ -177,15 +177,15 @@ public class EngineTests
 
     [Test] public void SetOscParams_DoesNotThrow()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         Assert.DoesNotThrow(() => e.SetOscParams(1.0f, 0.5f, 0f));
     }
 
     [Test] public void SetOscParams_Osc2Level_Zero_ReducesOutput()
     {
         // OSC2 level=0 should produce less output than OSC2 level=1
-        using var e1 = new Engine();
-        using var e2 = new Engine();
+        using var e1 = new VAEngine();
+        using var e2 = new VAEngine();
         e1.SetOscParams(1.0f, 0.0f, 0f);
         e2.SetOscParams(1.0f, 1.0f, 0f);
         e1.SendNoteOn(60, 0.8f, 2, 5, 0);
@@ -203,7 +203,7 @@ public class EngineTests
     [Test] public void SetOscParams_DetuneZero_NoBeating()
     {
         // Detune=0 should produce stable output (no beating)
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SetOscParams(1.0f, 1.0f, 0f);
         e.SendNoteOn(36, 0.8f, 2, 5, 0); // low C
         var buf = new float[44100 * 2]; // 1 second stereo
@@ -220,14 +220,14 @@ public class EngineTests
 
     [Test] public void SetFilterEnv_DoesNotThrow()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         Assert.DoesNotThrow(() => e.SetFilterEnv(0.01f, 0.3f, 0f, 0.2f));
     }
 
     [Test] public void SetFilterEnv_WithHighEnvAmt_ModulatesCutoff()
     {
         // FilterEnv + high ENV AMT should modulate cutoff over time
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SetFilterParams(0.2f, 0f, FilterKind.Roland); // low cutoff base
         e.SetFilterEnv(0.001f, 0.5f, 0f, 0.1f);        // fast attack, long decay
         e.SetFilterEnvAmount(1.0f);                      // full modulation
@@ -254,8 +254,8 @@ public class EngineTests
     {
         // ENV AMT=0: two engines with different filter ENV params but AMT=0
         // must produce identical output (filter ENV not applied)
-        using var e1 = new Engine();
-        using var e2 = new Engine();
+        using var e1 = new VAEngine();
+        using var e2 = new VAEngine();
         e1.SetFilterParams(0.5f, 0f, FilterKind.Roland);
         e2.SetFilterParams(0.5f, 0f, FilterKind.Roland);
         e1.SetFilterEnv(0.001f, 0.1f, 0f, 0.1f);   // fast env
@@ -277,7 +277,7 @@ public class EngineTests
 
     [Test] public void SetAmpEnv_LongAttack_ProducesGradualRise()
     {
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SetAmpEnv(1.0f, 0.1f, 1.0f, 0.1f); // 1 second attack
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
         var buf_early = new float[512];
@@ -300,7 +300,7 @@ public class EngineTests
     {
         foreach (WaveType wave in System.Enum.GetValues(typeof(WaveType)))
         {
-            using var e = new Engine();
+            using var e = new VAEngine();
             e.SetWave(wave);
             e.SendNoteOn(60, 0.8f, 2, 5, 0);
             var buf = new float[1024];
@@ -320,7 +320,7 @@ public class EngineTests
     [Test] public void SetOscParams_BothLevelsZero_NoteOnProducesSilence()
     {
         // OSC1+OSC2 level=0 set before NoteOn must produce near-silence.
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SetOscParams(0f, 0f, 0f);
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
         var buf = new float[2048];
@@ -334,8 +334,8 @@ public class EngineTests
     [Test] public void SetOscParams_DetuneCents_NoteOnProducesBeating()
     {
         // 20-cent detune set before NoteOn must produce beating vs no-detune engine.
-        using var e1 = new Engine();
-        using var e2 = new Engine();
+        using var e1 = new VAEngine();
+        using var e2 = new VAEngine();
         e1.SetOscParams(1f, 1f,  0f);
         e2.SetOscParams(1f, 1f, 20f);
         e1.SendNoteOn(36, 0.8f, 2, 5, 0);
@@ -357,7 +357,7 @@ public class EngineTests
     [Test] public void SetAmpEnv_LongAttack_NoteOnRisesOverTime()
     {
         // 2-second attack set before NoteOn: early output must be quieter than late.
-        using var e = new Engine();
+        using var e = new VAEngine();
         e.SetAmpEnv(2.0f, 0.1f, 1.0f, 0.1f);
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
         var buf_early = new float[1024];
@@ -383,8 +383,8 @@ public class EngineTests
         // Two engines: both NoteOn with detune=0.
         // After 1 buffer, engine2 changes detune to 30 while playing.
         // Their outputs must diverge — proves detune takes immediate effect.
-        using var e1 = new Engine();
-        using var e2 = new Engine();
+        using var e1 = new VAEngine();
+        using var e2 = new VAEngine();
         e1.SetOscParams(1f, 1f, 0f);
         e2.SetOscParams(1f, 1f, 0f);
         e1.SendNoteOn(36, 0.8f, 2, 5, 0);

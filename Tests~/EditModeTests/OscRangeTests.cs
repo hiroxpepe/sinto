@@ -16,7 +16,7 @@ public class OscRangeTests
 {
     const int SR = 44100;
 
-    static void NoteOn(Engine e, int midi)
+    static void NoteOn(VAEngine e, int midi)
     {
         e.SendNoteOn(midi, 0.8f, 2, 5, 0);
         var buf = new float[256];
@@ -28,7 +28,7 @@ public class OscRangeTests
     [Test]
     public void DefaultRange_BothOscAtBaseFrequency()
     {
-        var e = new Engine(SR, 2, 32, 1024);
+        var e = new VAEngine(SR, 2, 32, 1024);
         e.SetOscRange(0, 0); // 8' both
         NoteOn(e, 69);       // A4 = 440
         Assert.That(e.GetVoiceOscFrequency(69, 2, 0), Is.EqualTo(440f).Within(1f));
@@ -38,7 +38,7 @@ public class OscRangeTests
     [Test]
     public void Osc1Down16_Osc2Base_Osc1IsHalfFrequency()
     {
-        var e = new Engine(SR, 2, 32, 1024);
+        var e = new VAEngine(SR, 2, 32, 1024);
         e.SetOscRange(-1, 0); // OSC1 = 16' (one octave down), OSC2 = 8'
         NoteOn(e, 69);
         Assert.That(e.GetVoiceOscFrequency(69, 2, 0), Is.EqualTo(220f).Within(1f));
@@ -48,7 +48,7 @@ public class OscRangeTests
     [Test]
     public void Osc2Up4_IsDoubleFrequency()
     {
-        var e = new Engine(SR, 2, 32, 1024);
+        var e = new VAEngine(SR, 2, 32, 1024);
         e.SetOscRange(0, 1); // OSC2 = 4' (one octave up)
         NoteOn(e, 69);
         Assert.That(e.GetVoiceOscFrequency(69, 2, 1), Is.EqualTo(880f).Within(2f));
@@ -57,7 +57,7 @@ public class OscRangeTests
     [Test]
     public void Ranges_AreIndependentBetweenOscillators()
     {
-        var e = new Engine(SR, 2, 32, 1024);
+        var e = new VAEngine(SR, 2, 32, 1024);
         e.SetOscRange(-1, 1); // OSC1 down, OSC2 up = two octaves apart
         NoteOn(e, 60);        // C4
         float f1 = e.GetVoiceOscFrequency(60, 2, 0);

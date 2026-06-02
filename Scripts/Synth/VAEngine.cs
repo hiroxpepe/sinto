@@ -5,15 +5,16 @@ using System;
 using System.Threading;
 using Signo.Core.Audio;
 using Signo.Core.Effects;
+using Signo.Core.Signal;
 
 namespace Signo.Core.Synth;
 
 /// <summary>Chorus slot mode: which modulation effect occupies the chorus send bus / insert slot.</summary>
 public enum ChorusType { Chorus, Flanger, Phaser, Tremolo, Vibrato, AutoWah }
 
-/// <summary>Main synthesizer engine. Lock-free SPSC event queue + voice manager.</summary>
+/// <summary>Virtual analog synthesizer engine. Implements ISynth (ISignal).</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
-public sealed class Engine : IDisposable {
+public sealed class VAEngine : ISynth, IDisposable {
     readonly RingBuffer<Event> _event_queue;
     readonly Voices            _voices;
     readonly Scaler            _scaler;
@@ -35,20 +36,9 @@ public sealed class Engine : IDisposable {
     int   _arp_track_id;
     bool  _arp_started;
     // ── Send/return FX (QY70-style shared busses) ───────────────────────
-    readonly Reverb   _reverb = new Reverb();
-    readonly Chorus   _chorus;
-    readonly Flanger  _flanger;
-    readonly Phaser   _phaser;
-    readonly Tremolo  _tremolo;
-    readonly Vibrato  _vibrato;
-    readonly AutoWah  _autoWah;
-    readonly Delay    _delay;
-    float _reverb_send;
-    float _chorus_send;   // shared send for chorus/flanger/phaser slot
-    float _delay_send;
-    float _delay_feedback = 0.5f;
-    ChorusType _chorus_type = ChorusType.Chorus;
-    float[] _fx_scratch = new float[0];
+    // FX ownership moved to Channel and EffectBus (ARCHITECTURE.md Phase 3)
+    // VAEngine owns only voice synthesis. FX are managed externally.
+    ChorusType _chorus_type = ChorusType.Chorus;  // kept for UI state only
     float    _osc1_level     = 1.0f;
     float    _osc2_level     = 0.5f;
     float    _osc1_pw        = 0.5f;
@@ -64,7 +54,7 @@ public sealed class Engine : IDisposable {
     public float currentBpm       => _current_bpm;
     public long  dspTimeSamples   => Volatile.Read(ref _dsp_time_samples);
 
-    public Engine(int sampleRate = 44100, int channels = 2,
+    public VAEngine(int sampleRate = 44100, int channels = 2,
         int maxVoices = 32, int bufferSize = 1024) {
         if (sampleRate <= 0) sampleRate = 44100;
         if (channels <= 0)   channels = 2;
@@ -82,17 +72,7 @@ public sealed class Engine : IDisposable {
         _current_bpm   = 120f;
         _dsp_time_samples = 0L;
         _arp_step_samples = (int)(_sample_rate * (60f / _arp_rate_hz) / 4f);
-        _chorus  = new Chorus(_sample_rate);
-        _flanger = new Flanger(_sample_rate);
-        _phaser  = new Phaser(_sample_rate);
-        _tremolo = new Tremolo(_sample_rate);
-        _vibrato = new Vibrato(_sample_rate);
-        _autoWah = new AutoWah(_sample_rate);
-        _delay   = new Delay(_sample_rate);
-        // Send busses run full-wet; the send/return amount is applied by Engine.
-        _reverb.mix = 1f; _reverb.enabled = true;
-        _chorus.mix = 1f; _chorus.enabled = true;
-        _delay.mix  = 1f; _delay.enabled  = true;
+        // FX initialized externally in Channel and EffectBus
         Calc.Initialize();
     }
 
@@ -216,21 +196,6 @@ public sealed class Engine : IDisposable {
     // ── Send/return FX API ──────────────────────────────────────────────
     /// <summary>Reverb send amount (0..1).</summary>
     public void SetChorusType(ChorusType type)    => _chorus_type = type;
-    public void SetFlangerParams(float rateHz, float depth, float feedback)
-        => _flanger.SetParams(rateHz, depth, feedback, _chorus_send);
-    public void SetPhaserParams(float rateHz, float depth, float resonance)
-        => _phaser.SetParams(rateHz, depth, resonance, _chorus_send);
-    public void SetFlangerBpmSync(float bpm, NoteValue note) => _flanger.SetBpmSync(bpm, note);
-    public void SetPhaserBpmSync(float bpm, NoteValue note)  => _phaser.SetBpmSync(bpm, note);
-    public void SetFlangerLfoWaveform(LfoWaveform w)        => _flanger.SetLfoWaveform(w);
-    public void SetFlangerStepMode(FlangerStepMode m)        => _flanger.SetStepMode(m);
-    public void SetFlangerStepRate(int rate)                 => _flanger.SetStepRate(rate);
-    public void SetTremoloParams(float rateHz, float depth)  { _tremolo.SetParams(rateHz, depth); _tremolo.Send = _chorus_send; }
-    public void SetVibratoParams(float rateHz, float depth)  { _vibrato.SetParams(rateHz, depth); _vibrato.Send = _chorus_send; }
-    public void SetAutoWahParams(float sens, float freq, float peak) { _autoWah.SetParams(sens, freq, peak); _autoWah.Send = _chorus_send; }
-    public void SetTremoloWaveform(TremoloWaveform w)        => _tremolo.SetWaveform(w);
-    public void SetAutoWahMode(WahMode m)                    => _autoWah.SetMode(m);
-    public void SetPhaserLfoWaveform(LfoWaveform w)  => _phaser.SetLfoWaveform(w);
 
     /// <summary>
     /// SE-70 style BPM sync: reset the active modulation FX LFO phase to 0
@@ -238,45 +203,15 @@ public sealed class Engine : IDisposable {
     /// </summary>
     public void TriggerBpmSyncReset()
     {
-        switch (_chorus_type) {
-            case ChorusType.Flanger: _flanger.Reset(); break;
-            case ChorusType.Phaser:  _phaser.Reset();  break;
-            case ChorusType.Tremolo: _tremolo.Reset();  break;
-            case ChorusType.Vibrato: _vibrato.Reset();  break;
-        }
+        // FX BPM sync moved to Channel/EffectBus
     }
-    public void SetDelayBpmSync(float bpm, NoteValue note)
-        => SetDelayParams(note.ToMs(bpm) / 1000f, _delay_feedback);
 
-    public void SetReverbSend(float amount) => _reverb_send = Clamp01(amount);
     /// <summary>Chorus send amount (0..1).</summary>
-    public void SetChorusSend(float amount) {
-        _chorus_send    = Clamp01(amount);
-        _flanger.Send   = _chorus_send;
-        _phaser.Send    = _chorus_send;
-        _tremolo.Send   = _chorus_send;
-        _vibrato.Send   = _chorus_send;
-        _autoWah.Send   = _chorus_send;
-    }
     /// <summary>Delay send amount (0..1).</summary>
-    public void SetDelaySend(float amount) => _delay_send = Clamp01(amount);
 
     /// <summary>Reverb main params: room size and damping (0..1).</summary>
-    public void SetReverbParams(float roomSize, float damping) {
-        _reverb.roomSize = Clamp01(roomSize);
-        _reverb.damping  = Clamp01(damping);
-    }
     /// <summary>Chorus main params: rate (Hz) and depth (0..1).</summary>
-    public void SetChorusParams(float rateHz, float depth) {
-        _chorus.rate  = rateHz < 0.01f ? 0.01f : rateHz;
-        _chorus.depth = Clamp01(depth);
-    }
     /// <summary>Delay main params: time (seconds) and feedback (0..1).</summary>
-    public void SetDelayParams(float timeSec, float feedback) {
-        _delay.time       = timeSec < 0f ? 0f : timeSec;
-        _delay.feedback   = Clamp01(feedback);
-        _delay_feedback   = Clamp01(feedback);
-    }
 
     static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
 
@@ -326,6 +261,11 @@ public sealed class Engine : IDisposable {
         _event_queue.TryEnqueue(new Event(EventKind.SwapPreset));
     }
 
+    // ── ISignal implementation ────────────────────────────────────────
+    public bool enabled { get; set; } = true;
+    public void Process(Span<float> buffer, int channels) => ProcessAudioCallback(buffer);
+    public void Reset() { /* voice reset handled internally */ }
+
     public void ProcessAudioCallback(Span<float> buffer) {
         _scaler.OnCallbackBegin();
         int frames = buffer.Length / _channels;
@@ -356,38 +296,11 @@ public sealed class Engine : IDisposable {
         }
         if (_arp_enabled) AdvanceArp(sub.Length / _channels);
         _voices.RenderSamples(sub, _channels);
-        // Insert effects applied directly to the mix (dry+wet).
-        switch (_chorus_type) {
-            case ChorusType.Flanger:  if (_chorus_send > 0f) _flanger.Process(sub, _channels);  break;
-            case ChorusType.Phaser:   if (_chorus_send > 0f) _phaser.Process(sub, _channels);   break;
-            case ChorusType.Tremolo:  if (_chorus_send > 0f) _tremolo.Process(sub, _channels);  break;
-            case ChorusType.Vibrato:  if (_chorus_send > 0f) _vibrato.Process(sub, _channels);  break;
-            case ChorusType.AutoWah:  if (_chorus_send > 0f) _autoWah.Process(sub, _channels);  break;
-        }
-        ApplySendFx(sub);
+        // FX applied externally by Channel and EffectBus
         Interlocked.Add(ref _dsp_time_samples, sub.Length);
     }
 
-    void ApplySendFx(Span<float> dry) {
-        bool hasChorus = _chorus_send > 0f && _chorus_type == ChorusType.Chorus;
-        if (_reverb_send <= 0f && _delay_send <= 0f && !hasChorus) return;
-        int n = dry.Length;
-        if (_fx_scratch.Length < n) _fx_scratch = new float[n];
-        var scratch = _fx_scratch.AsSpan(0, n);
-
-        SendBus(dry, scratch, _reverb, _reverb_send);
-        if (_chorus_type == ChorusType.Chorus)
-            SendBus(dry, scratch, _chorus, _chorus_send);
-        SendBus(dry, scratch, _delay, _delay_send);
-    }
-
-    void SendBus(Span<float> dry, Span<float> scratch, IEffect fx, float send) {
-        if (send <= 0f) return;
-        // copy dry * send into scratch, process full-wet, add the return to dry
-        for (int i = 0; i < dry.Length; i++) scratch[i] = dry[i] * send;
-        fx.Process(scratch, _channels);
-        for (int i = 0; i < dry.Length; i++) dry[i] += scratch[i];
-    }
+    // ApplySendFx and SendBus moved to EffectBus
 
     // Advance the arpeggiator by `frames`; on each step boundary stop the
     // previous note and start the next held note. Audio-thread only (SPSC safe).
@@ -462,7 +375,7 @@ public sealed class Engine : IDisposable {
                 _scaler.ForceSetTier(ev.IntParam);
                 break;
             case EventKind.SwapPreset:
-                // Preset swap handled by Engine state owner via Interlocked.Exchange
+                // Preset swap handled by VAEngine state owner via Interlocked.Exchange
                 break;
             case EventKind.SetBPM:
                 _current_bpm = ev.FloatParam;

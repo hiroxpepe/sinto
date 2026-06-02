@@ -4,6 +4,7 @@
 using System;
 using NUnit.Framework;
 using Signo.Core.Effects;
+using Signo.Core.Signal;
 
 namespace Signo.Tests.Effects;
 
@@ -62,24 +63,25 @@ public class BpmNoteTests
     // ── MOD and DELAY have independent NoteValue ─────────────────────────
 
     [Test]
-    public void Engine_SetFlangerBpmSync_Quarter_DoesNotThrow()
+    public void Channel_SetFlangerBpmSync_Quarter_DoesNotThrow()
     {
-        var e = new Signo.Core.Synth.Engine(44100, 2, 8, 512);
-        Assert.DoesNotThrow(() => e.SetFlangerBpmSync(120f, NoteValue.Quarter));
+        var ch = new Channel(44100);
+        var fx = new Flanger(44100);
+        Assert.DoesNotThrow(() => { fx.SetBpmSync(120f, NoteValue.Quarter); ch.AddInsert(fx); });
     }
 
     [Test]
-    public void Engine_SetDelayBpmSync_Eighth_DoesNotThrow()
+    public void EffectBus_SetDelayBpmSync_Eighth_DoesNotThrow()
     {
-        var e = new Signo.Core.Synth.Engine(44100, 2, 8, 512);
-        Assert.DoesNotThrow(() => e.SetDelayBpmSync(120f, NoteValue.Eighth));
+        var bus = new EffectBus(44100);
+        Assert.DoesNotThrow(() => { bus.Delay.time = NoteValue.Eighth.ToMs(120f) / 1000f; });
     }
 
     [Test]
-    public void Engine_SetDelayBpmSync_Sixteenth_DoesNotThrow()
+    public void EffectBus_SetDelayBpmSync_Sixteenth_DoesNotThrow()
     {
-        var e = new Signo.Core.Synth.Engine(44100, 2, 8, 512);
-        Assert.DoesNotThrow(() => e.SetDelayBpmSync(120f, NoteValue.Sixteenth));
+        var bus = new EffectBus(44100);
+        Assert.DoesNotThrow(() => { bus.Delay.time = NoteValue.Sixteenth.ToMs(120f) / 1000f; });
     }
 
     // ── XAML has 5-note grid for MOD and DELAY ───────────────────────────

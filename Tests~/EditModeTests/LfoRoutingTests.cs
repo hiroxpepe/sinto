@@ -9,7 +9,7 @@ namespace Signo.Tests.Synth;
 
 /// <summary>
 /// LFO routing to DCF cutoff and DCA amplitude. The LFO DSP already modulates
-/// these targets inside Voice; this covers the Engine API that sets LFO rate,
+/// these targets inside Voice; this covers the VAEngine API that sets LFO rate,
 /// depth and destination so the modulation actually takes effect.
 /// </summary>
 [TestFixture]
@@ -17,7 +17,7 @@ public class LfoRoutingTests
 {
     const int SR = 44100;
 
-    static void Render(Engine e, float[] buf, int times)
+    static void Render(VAEngine e, float[] buf, int times)
     {
         for (int i = 0; i < times; i++) e.ProcessAudioCallback(buf.AsSpan());
     }
@@ -25,7 +25,7 @@ public class LfoRoutingTests
     [Test]
     public void NoLfo_CutoffStaysConstant()
     {
-        var e = new Engine(SR, 2, 32, 512);
+        var e = new VAEngine(SR, 2, 32, 512);
         e.SetFilterParams(0.5f, 0.2f, FilterKind.Moog);
         e.SetLfoToCutoff(0f, 5f); // depth 0
         var buf = new float[512];
@@ -41,7 +41,7 @@ public class LfoRoutingTests
     [Test]
     public void LfoToCutoff_MakesCutoffVaryOverTime()
     {
-        var e = new Engine(SR, 2, 32, 512);
+        var e = new VAEngine(SR, 2, 32, 512);
         e.SetFilterParams(0.5f, 0.2f, FilterKind.Moog);
         e.SetLfoToCutoff(1f, 8f); // strong depth, 8 Hz
         var buf = new float[512];
@@ -60,7 +60,7 @@ public class LfoRoutingTests
     [Test]
     public void LfoToAmp_IsAcceptedWithoutError()
     {
-        var e = new Engine(SR, 2, 32, 512);
+        var e = new VAEngine(SR, 2, 32, 512);
         e.SetLfoToAmp(0.5f, 5f);
         var buf = new float[512];
         Assert.DoesNotThrow(() => {
@@ -73,7 +73,7 @@ public class LfoRoutingTests
     [Test]
     public void SetLfoToCutoff_ClampsDepthToValidRange()
     {
-        var e = new Engine(SR, 2, 32, 512);
+        var e = new VAEngine(SR, 2, 32, 512);
         Assert.DoesNotThrow(() => e.SetLfoToCutoff(5f, 8f));   // over-range depth
         Assert.DoesNotThrow(() => e.SetLfoToCutoff(-1f, 8f));  // negative depth
     }

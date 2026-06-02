@@ -8,14 +8,14 @@ using Signo.Core.Effects;
 namespace Signo.Tests.Effects;
 
 /// <summary>
-/// IAudioEffect / ISendEffect / IInsertEffect interface contract tests.
+/// IEffect / ISendEffect / IInsertEffect interface contract tests.
 /// </summary>
 [TestFixture]
 public class EffectInterfaceTests
 {
     const int SR = 44100;
 
-    // ── IAudioEffect ─────────────────────────────────────────────────────
+    // ── IEffect ─────────────────────────────────────────────────────
 
     [Test]
     public void Chorus_Implements_ISendEffect()
@@ -105,12 +105,12 @@ public class EffectInterfaceTests
         Assert.That(Diff(buf, dry), Is.GreaterThan(0.1f));
     }
 
-    // ── InsertFxChain ────────────────────────────────────────────────────
+    // ── Chain ────────────────────────────────────────────────────
 
     [Test]
-    public void InsertFxChain_Empty_PassesDryThrough()
+    public void Chain_Empty_PassesDryThrough()
     {
-        var chain = new InsertFxChain();
+        var chain = new Chain();
         var buf = MakeSine(440f, 1024);
         var dry = MakeSine(440f, 1024);
         chain.Process(buf.AsSpan(), 2);
@@ -118,9 +118,9 @@ public class EffectInterfaceTests
     }
 
     [Test]
-    public void InsertFxChain_WithFlanger_ModifiesSignal()
+    public void Chain_WithFlanger_ModifiesSignal()
     {
-        var chain = new InsertFxChain();
+        var chain = new Chain();
         var fx = new Flanger(SR);
         fx.Send = 1f;
         chain.Add(fx);
@@ -131,9 +131,9 @@ public class EffectInterfaceTests
     }
 
     [Test]
-    public void InsertFxChain_Remove_StopsEffect()
+    public void Chain_Remove_StopsEffect()
     {
-        var chain = new InsertFxChain();
+        var chain = new Chain();
         var fx = new Flanger(SR);
         fx.Send = 1f;
         chain.Add(fx);

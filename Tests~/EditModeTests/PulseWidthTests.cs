@@ -15,7 +15,7 @@ public class PulseWidthTests
 
     static float[] RenderSquare(float pw)
     {
-        var e = new Engine(SR, 1, 16, 2048);
+        var e = new VAEngine(SR, 1, 16, 2048);
         e.SetOscWaves(WaveType.Square, WaveType.Square);
         e.SetPulseWidth(pw, pw);
         e.SendNoteOn(57, 0.9f, 2, 5, 0); // A3
@@ -38,7 +38,7 @@ public class PulseWidthTests
     [Test]
     public void SetPulseWidth_Accepted()
     {
-        var e = new Engine(SR, 1, 16, 1024);
+        var e = new VAEngine(SR, 1, 16, 1024);
         Assert.DoesNotThrow(() => e.SetPulseWidth(0.3f, 0.7f));
         // out-of-range values are clamped, not thrown
         Assert.DoesNotThrow(() => e.SetPulseWidth(-1f, 5f));

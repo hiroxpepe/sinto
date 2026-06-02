@@ -10,7 +10,7 @@ namespace Signo.Core.Effects;
 /// Ordered chain of insert effects applied in-place to a buffer.
 /// Each effect receives the output of the previous one.
 /// </summary>
-public sealed class InsertFxChain
+public sealed class Chain
 {
     readonly List<IInsertEffect> _chain = new();
 

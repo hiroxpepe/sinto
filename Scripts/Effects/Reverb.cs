@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
+using Signo.Core.Signal;
 
 namespace Signo.Core.Effects;
 
@@ -10,7 +11,7 @@ namespace Signo.Core.Effects;
 /// with a stereo spread on the right channel for a wide, natural tail.
 /// </summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
-public sealed class Reverb : MonoEffect {
+public sealed class Reverb : MonoEffect, ISendEffect {
     // Jezar's original tunings (samples @ 44.1 kHz).
     static readonly int[] COMB = { 1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617 };
     static readonly int[] ALLPASS = { 556, 441, 341, 225 };

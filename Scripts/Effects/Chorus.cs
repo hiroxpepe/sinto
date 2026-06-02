@@ -2,13 +2,14 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
+using Signo.Core.Signal;
 using Signo.Core.Synth;
 
 namespace Signo.Core.Effects;
 
 /// <summary>BBD-style chorus with modulated delay lines.</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
-public sealed class Chorus : MonoEffect {
+public sealed class Chorus : MonoEffect, ISendEffect {
     readonly float[] _delay_l;
     readonly float[] _delay_r;
     int   _write_pos;

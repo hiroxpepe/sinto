@@ -2,12 +2,13 @@
 // Licensed under the MIT License.
 #nullable enable
 using System;
+using Signo.Core.Signal;
 
 namespace Signo.Core.Effects;
 
 /// <summary>Stereo delay with fractional read pointer (smooth time changes).</summary>
 /// <author>h.adachi (STUDIO MeowToon)</author>
-public sealed class Delay : IEffect {
+public sealed class Delay : IEffect, ISendEffect {
 #nullable enable
     readonly float[] _delay_buf_l;
     readonly float[] _delay_buf_r;

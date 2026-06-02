@@ -5,6 +5,7 @@ using System;
 using NUnit.Framework;
 using Signo.Core.Synth;
 using Signo.Core.Effects;
+using Signo.Core.Signal;
 
 namespace Signo.Tests.UI;
 
@@ -40,45 +41,48 @@ public class ModSelectorDecisionTests
             "ChorusType must have AutoWah member.");
 
     [Test]
-    public void Engine_SetChorusType_Tremolo_DoesNotThrow()
+    public void VAEngine_SetChorusType_Tremolo_DoesNotThrow()
     {
-        var e = new Engine(44100, 2, 8, 512);
+        var e = new VAEngine(44100, 2, 8, 512);
         Assert.DoesNotThrow(() => e.SetChorusType(ChorusType.Tremolo));
     }
 
     [Test]
-    public void Engine_SetChorusType_Vibrato_DoesNotThrow()
+    public void VAEngine_SetChorusType_Vibrato_DoesNotThrow()
     {
-        var e = new Engine(44100, 2, 8, 512);
+        var e = new VAEngine(44100, 2, 8, 512);
         Assert.DoesNotThrow(() => e.SetChorusType(ChorusType.Vibrato));
     }
 
     [Test]
-    public void Engine_SetChorusType_AutoWah_DoesNotThrow()
+    public void VAEngine_SetChorusType_AutoWah_DoesNotThrow()
     {
-        var e = new Engine(44100, 2, 8, 512);
+        var e = new VAEngine(44100, 2, 8, 512);
         Assert.DoesNotThrow(() => e.SetChorusType(ChorusType.AutoWah));
     }
 
     [Test]
-    public void Engine_SetTremoloParams_DoesNotThrow()
+    public void Channel_SetTremoloParams_DoesNotThrow()
     {
-        var e = new Engine(44100, 2, 8, 512);
-        Assert.DoesNotThrow(() => e.SetTremoloParams(4f, 0.8f));
+        var ch = new Channel(44100);
+        var fx = new Tremolo(44100);
+        Assert.DoesNotThrow(() => { fx.SetParams(4f, 0.8f); ch.AddInsert(fx); });
     }
 
     [Test]
-    public void Engine_SetVibratoParams_DoesNotThrow()
+    public void Channel_SetVibratoParams_DoesNotThrow()
     {
-        var e = new Engine(44100, 2, 8, 512);
-        Assert.DoesNotThrow(() => e.SetVibratoParams(4f, 0.8f));
+        var ch = new Channel(44100);
+        var fx = new Vibrato(44100);
+        Assert.DoesNotThrow(() => { fx.SetParams(4f, 0.8f); ch.AddInsert(fx); });
     }
 
     [Test]
-    public void Engine_SetAutoWahParams_DoesNotThrow()
+    public void Channel_SetAutoWahParams_DoesNotThrow()
     {
-        var e = new Engine(44100, 2, 8, 512);
-        Assert.DoesNotThrow(() => e.SetAutoWahParams(0.7f, 0.5f, 0.7f));
+        var ch = new Channel(44100);
+        var fx = new AutoWah(44100);
+        Assert.DoesNotThrow(() => { fx.SetParams(0.7f, 0.5f, 0.7f); ch.AddInsert(fx); });
     }
 }
 

@@ -48,9 +48,9 @@ public class BpmSyncResetTests
     }
 
     [Test]
-    public void Engine_BpmSyncResetCalledOnBeat()
+    public void VAEngine_BpmSyncResetCalledOnBeat()
     {
-        var e = new Signo.Core.Synth.Engine(SR, 2, 8, 512);
+        var e = new Signo.Core.Synth.VAEngine(SR, 2, 8, 512);
         e.SetChorusType(Signo.Core.Synth.ChorusType.Flanger);
         Assert.DoesNotThrow(() => e.TriggerBpmSyncReset());
     }

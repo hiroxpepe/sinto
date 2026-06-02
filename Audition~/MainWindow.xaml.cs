@@ -12,6 +12,7 @@ using NAudio.Wave;
 using NAudio.Midi;
 using Signo.Core.Synth;
 using Signo.Core.Effects;
+using Signo.Core.Signal;
 
 namespace Signo.Audition;
 
@@ -22,7 +23,7 @@ public partial class MainWindow : Window
     const int SR = 44100;
     const int CH = 2;
 
-    Engine? _engine;
+    VAEngine? _engine;
     WasapiOut? _output;
     SignoProvider? _provider;
     readonly ScopeBuffer _scope = new();
@@ -81,7 +82,7 @@ public partial class MainWindow : Window
 
     void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        _engine = new Engine(SR, CH, 32, 1024);
+        _engine = new VAEngine(SR, CH, 32, 1024);
         _engine.SetWave(_current_wave);
         ApplyFilter();
         ApplyEnvelope();
@@ -878,7 +879,7 @@ public partial class MainWindow : Window
         string tag = GetTag(e);
         _trm_sqr = tag == "sqr";
         UpdateTrmWaveUI();
-        _engine?.SetTremoloWaveform(_trm_sqr ? TremoloWaveform.Square : TremoloWaveform.Triangle);
+        _provider?.SetTremoloWaveform(_trm_sqr ? TremoloWaveform.Square : TremoloWaveform.Triangle);
         ApplyFx();
     }
 
@@ -897,7 +898,7 @@ public partial class MainWindow : Window
         string tag = GetTag(e);
         _wah_down = tag == "down";
         UpdateWahDirUI();
-        _engine?.SetAutoWahMode(_wah_down ? WahMode.Down : WahMode.Up);
+        _provider?.SetAutoWahMode(_wah_down ? WahMode.Down : WahMode.Up);
         ApplyFx();
     }
 
@@ -1021,7 +1022,7 @@ public partial class MainWindow : Window
         ApplyLfoRouting();
     }
 
-    // HPF frequency 0..100 -> Engine.SetHpf.
+    // HPF frequency 0..100 -> VAEngine.SetHpf.
     void Hpf_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_loaded) return;
@@ -1139,10 +1140,10 @@ public partial class MainWindow : Window
     // Ranges are musical and centred: knob at 50 gives a usable default.
     void ApplyFx()
     {
-        if (!_loaded || _engine == null) return;
-        _engine.SetChorusSend(_chorus_on ? (float)(_fx_knob["ch:send"] / 100.0) : 0f);
-        _engine.SetDelaySend (_delay_on  ? (float)(_fx_knob["dl:send"] / 100.0) : 0f);
-        _engine.SetReverbSend(_reverb_on ? (float)(_fx_knob["rv:send"] / 100.0) : 0f);
+        if (!_loaded || _engine == null || _provider == null) return;
+        _provider.SetChorusSend(_chorus_on ? (float)(_fx_knob["ch:send"] / 100.0) : 0f);
+        _provider.SetDelaySend(_delay_on  ? (float)(_fx_knob["dl:send"] / 100.0) : 0f);
+        _provider.SetReverbSend(_reverb_on ? (float)(_fx_knob["rv:send"] / 100.0) : 0f);
 
         // CHORUS/FLANGER/PHASER slot
         float chrRate  = LogMap(_fx_knob["ch:rate"],  0.1f, 2.0f);
@@ -1151,48 +1152,48 @@ public partial class MainWindow : Window
             case ChorusType.Flanger:
                 float flgRate  = LogMap(_fx_knob["ch:rate"], 0.1f, 4.0f);
                 float flgDepth = Math.Min(1f, (float)(_fx_knob["ch:depth"] / 100.0) * 1.5f);
-                if (_chr_bpm_sync) _engine.SetFlangerBpmSync(_arp_bpm, _fx_note);
-                else               _engine.SetFlangerParams(flgRate, flgDepth, flgDepth * 0.8f);
-                _engine.SetFlangerLfoWaveform(LfoWaveform.Sine); // always sine; gate via StepMode
-                _engine.SetFlangerStepMode(_chr_sqr ? FlangerStepMode.Gate1 : FlangerStepMode.Off);
+                if (_chr_bpm_sync) _provider.SetFlangerBpmSync(_arp_bpm, _fx_note);
+                else               _provider.SetModFx(ChorusType.Flanger, flgRate, flgDepth, flgDepth * 0.8f, (float)(_fx_knob.TryGetValue("ch:send", out var _fs) ? _fs/100.0 : 1.0));
+                _provider.SetFlangerLfoWaveform(LfoWaveform.Sine); // always sine; gate via StepMode
+                _provider.SetFlangerStepMode(_chr_sqr ? FlangerStepMode.Gate1 : FlangerStepMode.Off);
                 break;
             case ChorusType.Phaser:
                 float phsRate  = LogMap(_fx_knob["ch:rate"], 0.1f, 4.0f);
                 float phsDepth = Math.Min(1f, (float)(_fx_knob["ch:depth"] / 100.0) * 1.5f);
-                if (_chr_bpm_sync) _engine.SetPhaserBpmSync(_arp_bpm, _fx_note);
-                else               _engine.SetPhaserParams(phsRate, phsDepth, Math.Min(0.95f, phsDepth * 1.4f));
-                _engine.SetPhaserLfoWaveform(_chr_sqr ? LfoWaveform.Square : LfoWaveform.Sine);
+                if (_chr_bpm_sync) _provider.SetPhaserBpmSync(_arp_bpm, _fx_note);
+                else               _provider.SetModFxPhaser(phsRate, phsDepth, Math.Min(0.95f, phsDepth * 1.4f), (float)(_fx_knob.TryGetValue("ch:send", out var _ps2) ? _ps2/100.0 : 1.0));
+                _provider.SetPhaserLfoWaveform(_chr_sqr ? LfoWaveform.Square : LfoWaveform.Sine);
                 break;
             case ChorusType.Tremolo:
                 float trmRate  = LogMap(_fx_knob["ch:rate"],  0.1f, 8.0f);
                 float trmDepth = (float)(_fx_knob["ch:depth"] / 100.0);
-                if (_chr_bpm_sync) _engine.SetTremoloParams(_fx_note.ToHz(_arp_bpm), trmDepth);
-                else               _engine.SetTremoloParams(trmRate, trmDepth);
+                if (_chr_bpm_sync) _provider.SetModFx(ChorusType.Tremolo, _fx_note.ToHz(_arp_bpm), trmDepth, 0f, (float)(_fx_knob.TryGetValue("ch:send", out var _ts) ? _ts/100.0 : 1.0));
+                else               _provider.SetModFx(ChorusType.Tremolo, trmRate, trmDepth, 0f, (float)(_fx_knob.TryGetValue("ch:send", out var _ts) ? _ts/100.0 : 1.0));
                 break;
             case ChorusType.Vibrato:
                 float vibRate  = LogMap(_fx_knob["ch:rate"],  0.1f, 8.0f);
                 float vibDepth = (float)(_fx_knob["ch:depth"] / 100.0);
-                if (_chr_bpm_sync) _engine.SetVibratoParams(_fx_note.ToHz(_arp_bpm), vibDepth);
-                else               _engine.SetVibratoParams(vibRate, vibDepth);
+                if (_chr_bpm_sync) _provider.SetModFx(ChorusType.Vibrato, _fx_note.ToHz(_arp_bpm), vibDepth, 0f, (float)(_fx_knob.TryGetValue("ch:send", out var _vs) ? _vs/100.0 : 1.0));
+                else               _provider.SetModFx(ChorusType.Vibrato, vibRate, vibDepth, 0f, (float)(_fx_knob.TryGetValue("ch:send", out var _vs) ? _vs/100.0 : 1.0));
                 break;
             case ChorusType.AutoWah:
                 float wahSens = (float)(_fx_knob["ch:rate"]  / 100.0);
                 float wahPeak = (float)(_fx_knob["ch:depth"] / 100.0);
-                _engine.SetAutoWahParams(wahSens, 0.5f, wahPeak);
+                _provider.SetModFx(ChorusType.AutoWah, wahSens, 0.5f, wahPeak, (float)(_fx_knob.TryGetValue("ch:send", out var _ws) ? _ws/100.0 : 1.0));
                 break;
             default:
-                _engine.SetChorusParams(chrRate, chrDepth * 0.7f);
+                _provider.SetChorusParams(chrRate, chrDepth * 0.7f);
                 break;
         }
 
         // DELAY: BPM sync (note value) or direct ms
         if (_dl_bpm_sync)
-            _engine.SetDelayBpmSync(_arp_bpm, _dl_note);
+            _provider.SetDelayBpmSync(_arp_bpm, _dl_note);
         else
-            _engine.SetDelayParams(LogMap(_fx_knob["dl:time"], 0.06f, 0.6f),
+            _provider.SetDelayParams(LogMap(_fx_knob["dl:time"], 0.06f, 0.6f),
                                    (float)(_fx_knob["dl:fb"] / 100.0) * 0.85f);
 
-        _engine.SetReverbParams(0.3f + (float)(_fx_knob["rv:size"] / 100.0) * 0.65f,
+        _provider.SetReverbParams(0.3f + (float)(_fx_knob["rv:size"] / 100.0) * 0.65f,
                                 (float)(_fx_knob["rv:damp"] / 100.0) * 0.8f);
     }
 
@@ -1436,25 +1437,49 @@ internal readonly struct NoteCommand
 
 internal sealed class SignoProvider : ISampleProvider
 {
-    readonly Engine _engine;
+    readonly Signo.Core.Signal.SignoProvider _core;
     readonly System.Collections.Concurrent.ConcurrentQueue<NoteCommand> _notes = new();
     public WaveFormat WaveFormat { get; }
     public ScopeBuffer? Scope { get; set; }
 
-    public SignoProvider(Engine engine)
+    // Expose Channel and EffectBus for FX configuration
+    public Signo.Core.Signal.Channel   Channel   => _core.Channel;
+    public Signo.Core.Signal.EffectBus EffectBus => _core.EffectBus;
+
+    public SignoProvider(VAEngine engine)
     {
-        _engine = engine;
+        _core      = new Signo.Core.Signal.SignoProvider(engine);
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(44100, 2);
     }
+
     public void EnqueueNote(in NoteCommand cmd) => _notes.Enqueue(cmd);
+
+    // FX delegation to Core SignoProvider
+    public void SetChorusSend(float v)  => _core.SetChorusSend(v);
+    public void SetDelaySend(float v)   => _core.SetDelaySend(v);
+    public void SetReverbSend(float v)  => _core.SetReverbSend(v);
+    public void SetChorusParams(float r, float d) => _core.SetChorusParams(r, d);
+    public void SetDelayParams(float t, float f)  => _core.SetDelayParams(t, f);
+    public void SetReverbParams(float s, float d) => _core.SetReverbParams(s, d);
+    public void SetDelayBpmSync(float bpm, NoteValue note)   => _core.SetDelayBpmSync(bpm, note);
+    public void SetFlangerBpmSync(float bpm, NoteValue n) => _core.SetFlangerBpmSync(bpm, n);
+    public void SetFlangerLfoWaveform(LfoWaveform w)    => _core.SetFlangerLfoWaveform(w);
+    public void SetFlangerStepMode(FlangerStepMode m)    => _core.SetFlangerStepMode(m);
+    public void SetPhaserBpmSync(float bpm, NoteValue n) => _core.SetPhaserBpmSync(bpm, n);
+    public void SetModFxPhaser(float r, float d, float p, float s) => _core.SetModFxPhaser(r, d, p, s);
+    public void SetPhaserLfoWaveform(LfoWaveform w)      => _core.SetPhaserLfoWaveform(w);
+    public void SetTremoloWaveform(TremoloWaveform w)    => _core.SetTremoloWaveform(w);
+    public void SetAutoWahMode(WahMode m)                => _core.SetAutoWahMode(m);
+    public void SetModFx(ChorusType type, float rate, float depth, float p3, float send)
+        => _core.SetModFx(type, rate, depth, p3, send);
 
     public int Read(float[] buffer, int offset, int count)
     {
         while (_notes.TryDequeue(out var cmd)) {
-            if (cmd.On) _engine.SendNoteOn(cmd.Midi, cmd.Velocity, 2, 5, 0);
-            else        _engine.SendNoteOff(cmd.Midi, 2, 0);
+            if (cmd.On) _core.NoteOn(cmd.Midi, cmd.Velocity, 2, 5, 0);
+            else        _core.NoteOff(cmd.Midi, 2, 0);
         }
-        _engine.ProcessAudioCallback(buffer.AsSpan(offset, count));
+        _core.Process(buffer, offset, count, 2);
         Scope?.Push(buffer, offset, count, 2);
         return count;
     }

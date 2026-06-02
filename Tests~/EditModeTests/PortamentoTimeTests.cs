@@ -8,7 +8,7 @@ using Signo.Core.Synth;
 namespace Signo.Tests.Synth;
 
 /// <summary>
-/// Full coverage for SetPortamentoTime on both Voices and Engine (the Engine
+/// Full coverage for SetPortamentoTime on both Voices and VAEngine (the VAEngine
 /// method delegates to Voices). Verifies the time value reaches a voice on the
 /// next NoteOn and drives gliding: time = 0 snaps instantly, time &gt; 0 glides.
 /// </summary>
@@ -92,12 +92,12 @@ public class PortamentoTimeTests
         Assert.That(vm.GetVoiceIsGliding(72, 2), Is.False);
     }
 
-    // ── Engine.SetPortamentoTime (delegation) ───────────────────────────
+    // ── VAEngine.SetPortamentoTime (delegation) ───────────────────────────
 
     [Test]
-    public void Engine_SetZero_NoteOn_SnapsImmediately()
+    public void VAEngine_SetZero_NoteOn_SnapsImmediately()
     {
-        var e = new Engine(SR, 2, 32, 1024);
+        var e = new VAEngine(SR, 2, 32, 1024);
         e.SetPortamentoTime(0f);
         e.SendNoteOn(69, 0.8f, 2, 5, 0);
         var buf = new float[1024];
@@ -107,9 +107,9 @@ public class PortamentoTimeTests
     }
 
     [Test]
-    public void Engine_SetNonZero_ReusedVoice_Glides()
+    public void VAEngine_SetNonZero_ReusedVoice_Glides()
     {
-        var e = new Engine(SR, 2, 1, 1024); // single voice forces reuse
+        var e = new VAEngine(SR, 2, 1, 1024); // single voice forces reuse
         e.SetPortamentoTime(0.5f);
         var buf = new float[64];
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
@@ -117,13 +117,13 @@ public class PortamentoTimeTests
         e.SendNoteOn(72, 0.8f, 2, 5, 0);
         e.ProcessAudioCallback(buf.AsSpan());
         Assert.That(e.GetVoiceIsGliding(72, 2), Is.True,
-            "Engine.SetPortamentoTime must delegate so the reused voice glides.");
+            "VAEngine.SetPortamentoTime must delegate so the reused voice glides.");
     }
 
     [Test]
-    public void Engine_DelegatesValue_GlideReachesTargetAfterEnoughTime()
+    public void VAEngine_DelegatesValue_GlideReachesTargetAfterEnoughTime()
     {
-        var e = new Engine(SR, 2, 1, 8192);
+        var e = new VAEngine(SR, 2, 1, 8192);
         e.SetPortamentoTime(0.1f); // short glide (~4410 samples)
         var small = new float[64];
         e.SendNoteOn(60, 0.8f, 2, 5, 0);
@@ -139,9 +139,9 @@ public class PortamentoTimeTests
     }
 
     [Test]
-    public void Engine_NoActiveVoice_FrequencyQueryReturnsMinusOne()
+    public void VAEngine_NoActiveVoice_FrequencyQueryReturnsMinusOne()
     {
-        var e = new Engine(SR, 2, 32, 1024);
+        var e = new VAEngine(SR, 2, 32, 1024);
         Assert.That(e.GetVoiceCurrentFrequency(60, 2), Is.EqualTo(-1f));
         Assert.That(e.GetVoiceIsGliding(60, 2), Is.False);
     }

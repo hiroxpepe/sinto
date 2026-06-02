@@ -20,7 +20,7 @@ public class ShapeTests
 
     static float[] Render(WaveType wave, float shape, int frames = 2048)
     {
-        var e = new Engine(SR, 1, 16, frames);
+        var e = new VAEngine(SR, 1, 16, frames);
         e.SetWave(wave);
         e.SetShape(0.5f, 0.5f); // default neutral first
         e.SetShape(shape, shape);
